@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#1d1a39">
+  <meta name="description" content="Khipu: Guardianes del Código. Videojuego educativo peruano para aprender Python y SQL.">
+  <title>Khipu: Guardianes del Código</title>
+</head>
+<body>
+  <div id="juego"></div>
+  <div id="cargando">Cargando Tawa Pacha…</div>
+
+  <!-- Panel del jugador -->
+  <div class="panel perfil">
+    <div class="avatar" aria-hidden="true"></div>
+    <div>
+      <div class="nombre">CHASKI</div>
+      <div class="clase">Aprendiz · Yachay nivel 1</div>
+      <div class="barra"><i class="vida"></i></div>
+      <div class="barra"><i class="kallpa"></i></div>
+    </div>
+  </div>
+  <div class="panel recursos"><span class="semilla" aria-hidden="true"></span><span id="wayruru">0/0</span> wayruru</div>
+
+  <button class="panel boton-pantalla" id="boton-pantalla" aria-label="Pantalla completa">⛶</button>
+
+  <div class="aviso" id="aviso" role="status" hidden></div>
+
+  <div class="dialogo" id="dialogo" role="dialog" aria-live="polite" hidden>
+    <div class="dialogo-nombre" id="dialogo-nombre"></div>
+    <div class="dialogo-texto" id="dialogo-texto"></div>
+    <div class="dialogo-cerrar">tocar para cerrar ▼</div>
+  </div>
+
+  <!-- Controles táctiles -->
+  <div id="zona-joystick" aria-label="Joystick"></div>
+  <div id="joystick"><div id="perilla"></div></div>
+  <button id="boton-accion" aria-label="Hablar o interactuar">HABLAR</button>
+
+  <!-- Aviso para girar el celular -->
+  <div id="girar">
+    <div class="girar-icono">📱↻</div>
+    <p>Gira tu celular para jugar en horizontal</p>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

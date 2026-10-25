@@ -2,7 +2,7 @@
 // Cuando cambies archivos del juego, sube el número de VERSION para que los
 // celulares descarguen la versión nueva.
 
-const VERSION = "kl-v1";
+const VERSION = "kl-v2";
 const CACHE_JUEGO = `juego-${VERSION}`;
 const CACHE_PYTHON = "python-314.0.7"; // Pyodide: solo se descarga una vez
 

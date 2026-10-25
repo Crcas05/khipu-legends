@@ -1,12 +1,32 @@
-# Khipu Legends: Código Ancestral
+# Khipu: Guardianes del Código
 
 Videojuego educativo peruano para aprender Python y SQL. Una aventura donde programar es tener poder.
 
-**Juega aquí:** https://crcas05.github.io/khipu-legends/
+**Juego nuevo (en construcción):** https://crcas05.github.io/khipu-legends/selva/
+
+**Prototipo de Caral:** https://crcas05.github.io/khipu-legends/
 
 ## Estado
 
-Versión piloto: Región 1 (Caral), Misión 1 «La Voz del Pututu».
+- **Juego nuevo, carpeta `juego/`:** Etapa 1 de 6 lista. El Chaski camina por un pedazo de selva con joystick o teclado, junta semillas de wayruru y Tuki lo acompaña.
+- **Prototipo de Caral (raíz del repositorio):** sigue en línea hasta que el Episodio 1 lo reemplace.
+
+## Juego nuevo: cómo está hecho
+
+- **Phaser 4 + TypeScript + Vite**, en la carpeta `juego/`.
+- Cada vez que se suben cambios a `main`, **GitHub Actions** compila el juego y lo publica en `/selva/` (archivo `.github/workflows/publicar.yml`).
+- El mapa está en `juego/src/mundo/mapaSelva.ts` y se puede editar como texto.
+- El arte es provisional y está dibujado con código en `juego/src/arte/texturas.ts`. Se cambiará por un paquete de pixel art CC0 sin tocar el resto.
+
+Para probarlo en tu computadora:
+
+```bash
+cd juego
+npm install
+npm run dev
+```
+
+## Prototipo de Caral
 
 ## Cómo funciona
 
