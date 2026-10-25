@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#1D1A39"/>
+  <circle cx="256" cy="230" r="190" fill="#2B2552"/>
+  <path d="M128 170 H384" stroke="#F2B33D" stroke-width="20" stroke-linecap="round"/>
+  <g stroke="#E9DCC3" stroke-width="15" stroke-linecap="round">
+    <path d="M156 170 V350"/><path d="M212 170 V320"/><path d="M256 170 V370"/>
+    <path d="M300 170 V310"/><path d="M356 170 V340"/>
+  </g>
+  <circle cx="156" cy="240" r="17" fill="#C8102E"/><circle cx="212" cy="270" r="17" fill="#2A9D8F"/>
+  <circle cx="256" cy="225" r="17" fill="#F2B33D"/><circle cx="256" cy="310" r="17" fill="#C8102E"/>
+  <circle cx="300" cy="255" r="17" fill="#2A9D8F"/><circle cx="356" cy="235" r="17" fill="#F2B33D"/>
+  <text x="256" y="440" text-anchor="middle" font-family="Arial, sans-serif" font-weight="900" font-size="64" fill="#F2B33D" letter-spacing="4">KHIPU</text>
+</svg>

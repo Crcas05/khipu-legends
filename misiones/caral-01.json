@@ -1,0 +1,60 @@
+{
+  "id": "caral-01",
+  "region": "Caral",
+  "numero": 1,
+  "titulo": "La Voz del Pututu",
+  "aprende": "print() y texto entre comillas",
+  "escena": [
+    { "quien": "narrador", "texto": "La niebla del Olvido cubre Caral, la ciudad más antigua de América." },
+    { "quien": "narrador", "texto": "En medio de la plaza duerme un gigante de adobe. Nadie recuerda cómo despertarlo." },
+    { "quien": "heroe", "texto": "¿Hola? ¿Hay alguien aquí?" },
+    { "quien": "mama", "texto": "Te estaba esperando, {apodo}. Soy Mama Khipu, guardiana del conocimiento." },
+    { "quien": "mama", "texto": "Las piedras de Caral solo escuchan la lengua antigua. Sopla tu pututu y háblales en esa lengua." },
+    { "quien": "tuki", "texto": "¡Kraa! Y yo soy Tuki. Si te equivocas, te ayudo. ¡Equivocarse es parte del camino!" }
+  ],
+  "ensenanza": [
+    "`print()` hace que tu pututu diga algo en voz alta.",
+    "Lo que quieres decir va entre comillas, como una cuerda con un nudo en cada punta: `\"Hola\"`.",
+    "Cada `print` es una línea nueva."
+  ],
+  "ejemplo": "print(\"Allillanchu, Caral\")",
+  "ejemplo_nota": "Allillanchu significa «¿cómo estás?» en quechua.",
+  "prueba": {
+    "codigo": "print(\"Allillanchu, Caral\")",
+    "instruccion": "Cambia el saludo por el que tú quieras y sopla el pututu."
+  },
+  "reto": {
+    "instruccion": "Haz que tu pututu diga estas 3 líneas, en este orden:",
+    "lineas": ["Soy {apodo}", "Vengo a quitar la niebla", "Despierta, Caral"]
+  },
+  "bloques": [
+    "print(\"Soy {apodo}\")",
+    "print(\"Vengo a quitar la niebla\")",
+    "print(\"Despierta, Caral\")",
+    "print(Despierta)",
+    "Print(\"Despierta, Caral\")",
+    "print(\"Despierta, Caral)"
+  ],
+  "validacion": {
+    "total_lineas": 3,
+    "lineas_exactas": [{ "indice": 2, "texto": "Despierta, Caral" }],
+    "mensajes": {
+      "vacio": "Tu pututu no dijo nada. Agrega al menos un print.",
+      "menos": "El gigante abrió un ojo... pero aún le falta escuchar {faltan}. Recuerda: cada print dice una sola línea.",
+      "mas": "¡Demasiadas voces! El gigante se confundió: te pidieron {total} líneas y dijiste {n}.",
+      "linea": "El gigante escuchó, pero la línea {pos} debe decir: «{texto}»."
+    }
+  },
+  "pistas": [
+    "Cada print dice una sola línea. ¿Cuántas líneas te pidieron?",
+    "La tercera línea es: print(\"Despierta, Caral\")",
+    "Solución:\nprint(\"Soy {apodo}\")\nprint(\"Vengo a quitar la niebla\")\nprint(\"Despierta, Caral\")"
+  ],
+  "recompensa": {
+    "kallpa": 50,
+    "kallpa_minima": 20,
+    "poder": "Voz del Pututu",
+    "poder_descripcion": "Tus órdenes ahora mueven el mundo.",
+    "resumen": "Con print haces que el mundo te escuche."
+  }
+}

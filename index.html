@@ -2,11 +2,157 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Khipu Legends: Código Ancestral</title>
+  <meta name="description" content="Videojuego educativo peruano para aprender Python y SQL. Una aventura donde programar es tener poder.">
+  <meta name="theme-color" content="#1D1A39">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="img/icono.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="img/icono-192.png">
+  <link rel="stylesheet" href="css/estilos.css">
 </head>
 <body>
-  <h1>Khipu Legends: Código Ancestral</h1>
-  <p>Una aventura peruana donde programar es tener poder. Muy pronto.</p>
+  <!-- Barra superior: jugador, kallpa y estado de Python -->
+  <header class="hud" id="hud" hidden>
+    <div class="hud-jugador">
+      <span class="hud-avatar" id="hud-avatar"></span>
+      <span id="hud-apodo"></span>
+    </div>
+    <div class="hud-derecha">
+      <span class="chip-python" id="chip-python" title="Estado de Python"></span>
+      <span class="kallpa" title="Kallpa (fuerza)"><b id="hud-kallpa">0</b> kallpa</span>
+      <button class="boton-icono" id="btn-sonido" aria-label="Silenciar sonido">♪</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- 1. Inicio -->
+    <section class="pantalla" id="inicio">
+      <div class="portada">
+        <svg class="logo-khipu" viewBox="0 0 120 70" aria-hidden="true">
+          <path d="M8 12 H112" stroke="#F2B33D" stroke-width="5" stroke-linecap="round"/>
+          <path d="M20 12 V60 M36 12 V50 M52 12 V64 M68 12 V46 M84 12 V58 M100 12 V52" stroke-width="4" stroke-linecap="round" stroke="#E9DCC3"/>
+          <circle cx="20" cy="30" r="4.5" fill="#C8102E"/><circle cx="36" cy="38" r="4.5" fill="#2A9D8F"/>
+          <circle cx="52" cy="26" r="4.5" fill="#F2B33D"/><circle cx="52" cy="48" r="4.5" fill="#C8102E"/>
+          <circle cx="68" cy="34" r="4.5" fill="#2A9D8F"/><circle cx="84" cy="28" r="4.5" fill="#F2B33D"/>
+          <circle cx="100" cy="40" r="4.5" fill="#C8102E"/>
+        </svg>
+        <h1>Khipu Legends</h1>
+        <p class="subtitulo">Código Ancestral</p>
+        <p class="lema">Una aventura peruana donde programar es tener poder.</p>
+        <button class="boton boton-principal" id="btn-comenzar">Comenzar aventura</button>
+        <button class="boton boton-secundario" id="btn-reiniciar" hidden>Empezar desde cero</button>
+        <p class="nota-piloto">Versión piloto · Región 1: Caral</p>
+      </div>
+    </section>
+
+    <!-- 2. Elección de personaje -->
+    <section class="pantalla" id="personaje" hidden>
+      <h2>Elige tu Chaski Runa</h2>
+      <p class="ayuda">Los tres tienen los mismos poderes. Elige con quién te identificas.</p>
+      <div class="heroes" id="lista-heroes" role="radiogroup" aria-label="Personajes"></div>
+      <label class="campo">
+        <span>¿Cómo te llamarán en Tawa Pacha?</span>
+        <input id="input-apodo" maxlength="16" autocomplete="off" autocapitalize="words" placeholder="Tu apodo">
+      </label>
+      <p class="aviso" id="aviso-apodo" role="alert"></p>
+      <button class="boton boton-principal" id="btn-listo">¡Listo!</button>
+    </section>
+
+    <!-- 3. Escena de historia -->
+    <section class="pantalla" id="escena" hidden>
+      <div class="marco-escena" id="escena-arte"></div>
+      <div class="dialogo" id="dialogo" role="button" tabindex="0" aria-live="polite">
+        <div class="dialogo-retrato" id="dialogo-retrato"></div>
+        <div class="dialogo-cuerpo">
+          <p class="dialogo-nombre" id="dialogo-nombre"></p>
+          <p class="dialogo-texto" id="dialogo-texto"></p>
+        </div>
+      </div>
+      <button class="boton boton-principal" id="btn-siguiente">Siguiente ▸</button>
+    </section>
+
+    <!-- 4. Enseñanza de Mama Khipu -->
+    <section class="pantalla" id="ensenanza" hidden>
+      <div class="tarjeta-mentor">
+        <div class="retrato-grande" id="retrato-mama"></div>
+        <div>
+          <p class="etiqueta">Enseñanza de Mama Khipu</p>
+          <h2 id="titulo-ensenanza"></h2>
+        </div>
+      </div>
+      <ol class="lista-ensenanza" id="lista-ensenanza"></ol>
+      <pre class="codigo-ejemplo" id="codigo-ejemplo"></pre>
+      <p class="ayuda" id="nota-ejemplo"></p>
+      <button class="boton boton-principal" id="btn-a-practicar">¡A practicar!</button>
+    </section>
+
+    <!-- 5. Prueba guiada -->
+    <section class="pantalla" id="prueba" hidden>
+      <p class="etiqueta">Prueba guiada</p>
+      <h2>Sopla tu pututu</h2>
+      <p class="ayuda" id="instruccion-prueba"></p>
+      <div class="editor">
+        <textarea id="editor-prueba" rows="3" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" aria-label="Tu código"></textarea>
+        <div class="teclado-codigo" data-para="editor-prueba"></div>
+      </div>
+      <button class="boton boton-accion" id="btn-ejecutar-prueba">▶ Soplar el pututu</button>
+      <div class="salida" id="salida-prueba" aria-live="polite" hidden></div>
+      <div class="tuki" id="tuki-prueba" aria-live="polite" hidden></div>
+      <button class="boton boton-principal" id="btn-ir-reto" disabled>Ir al reto ▸</button>
+    </section>
+
+    <!-- 6. Reto -->
+    <section class="pantalla" id="reto" hidden>
+      <div class="marco-escena marco-chico" id="reto-arte"></div>
+      <p class="etiqueta">Reto · Misión 1</p>
+      <p id="instruccion-reto"></p>
+      <ol class="lineas-esperadas" id="lineas-esperadas"></ol>
+
+      <div class="pestanas" role="tablist">
+        <button role="tab" class="pestana activa" id="tab-bloques" aria-selected="true">Bloques</button>
+        <button role="tab" class="pestana" id="tab-libre" aria-selected="false">Escribir yo</button>
+      </div>
+
+      <div id="modo-bloques">
+        <p class="ayuda">Toca un bloque para agregarlo a tu programa. ¡Cuidado: algunos tienen Bugs!</p>
+        <div class="bloques-disponibles" id="bloques-disponibles"></div>
+        <p class="etiqueta">Tu programa</p>
+        <ol class="programa" id="programa"></ol>
+      </div>
+
+      <div id="modo-libre" hidden>
+        <div class="editor">
+          <textarea id="editor-reto" rows="5" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" aria-label="Tu código"></textarea>
+          <div class="teclado-codigo" data-para="editor-reto"></div>
+        </div>
+      </div>
+
+      <div class="acciones-reto">
+        <button class="boton boton-accion" id="btn-ejecutar-reto">▶ Soplar el pututu</button>
+        <button class="boton boton-secundario" id="btn-pista">Pedir pista (0/3)</button>
+      </div>
+      <div class="salida" id="salida-reto" aria-live="polite" hidden></div>
+      <div class="tuki" id="tuki-reto" aria-live="polite" hidden></div>
+    </section>
+
+    <!-- 7. Recompensa -->
+    <section class="pantalla" id="recompensa" hidden>
+      <div class="marco-escena" id="recompensa-arte"></div>
+      <h2 class="titulo-victoria">¡Caral despertó!</h2>
+      <p class="kallpa-ganada">+<span id="kallpa-ganada">0</span> kallpa</p>
+      <div class="tarjeta-poder">
+        <p class="etiqueta">Nuevo poder</p>
+        <p class="nombre-poder" id="nombre-poder"></p>
+        <p id="descripcion-poder"></p>
+      </div>
+      <p class="resumen" id="resumen-mision"></p>
+      <button class="boton boton-principal" id="btn-siguiente-mision" disabled>Misión 2: próximamente</button>
+      <button class="boton boton-secundario" id="btn-repetir">Repetir misión</button>
+      <button class="boton boton-secundario" id="btn-volver-inicio">Volver al inicio</button>
+    </section>
+  </main>
+
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>
