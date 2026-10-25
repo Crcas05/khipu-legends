@@ -1,0 +1,60 @@
+name: Publicar juego
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  compilar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Preparar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: juego/package-lock.json
+
+      - name: Instalar dependencias del juego
+        working-directory: juego
+        run: npm ci
+
+      - name: Compilar el juego
+        working-directory: juego
+        run: npm run build
+
+      - name: Armar el sitio
+        run: |
+          mkdir -p _site
+          rsync -a --exclude juego --exclude .github --exclude .git --exclude _site ./ _site/
+          mkdir -p _site/selva
+          cp -r juego/dist/. _site/selva/
+
+      - name: Subir el sitio
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  publicar:
+    needs: compilar
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.despliegue.outputs.page_url }}
+    steps:
+      - name: Publicar en GitHub Pages
+        id: despliegue
+        uses: actions/deploy-pages@v4
