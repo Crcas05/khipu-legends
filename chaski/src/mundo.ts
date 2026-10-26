@@ -4,7 +4,10 @@
 import { Scene } from "@babylonjs/core/scene";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
+import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { material } from "./personajes";
 
 export interface Choque {
@@ -28,6 +31,7 @@ function azar(semilla: number) {
 
 export function crearMundo(escena: Scene) {
   const mallas: Mesh[] = [];
+  const techos: Mesh[] = [];
   const choques: Choque[] = [];
   const leibles: Leible[] = [];
   const agrega = <T extends Mesh>(m: T) => (mallas.push(m), m);
@@ -68,7 +72,6 @@ export function crearMundo(escena: Scene) {
   sol.material = material(escena, "#ffd166", 0.5);
   escena.onBeforeRenderObservable.add(() => (inti.rotation.z += 0.01));
   choques.push({ x: 0, z: 0, r: 2.4 });
-  leibles.push({ posicion: new Vector3(0, 3.5, 0), texto: 'fuente.agua = True' });
 
   // Casas andinas: muros de adobe y techo rojo a cuatro aguas
   const casas: [number, number, number][] = [
@@ -83,12 +86,13 @@ export function crearMundo(escena: Scene) {
     techo.position.set(x, 3.45, z);
     techo.rotation.y = giro + Math.PI / 4;
     techo.material = material(escena, "#b8432f");
+    techos.push(techo);
     const puerta = agrega(MeshBuilder.CreateBox("puerta", { width: 1, height: 1.7, depth: 0.1 }, escena));
     puerta.parent = muro;
     puerta.position.set(0, -0.45, 1.81);
     puerta.material = material(escena, "#2b6cb0");
     choques.push({ x, z, r: 2.6 });
-    if (i === 0) leibles.push({ posicion: new Vector3(x, 4.8, z), texto: 'casa.techo = "rojo"' });
+    if (i === 0) leibles.push({ posicion: new Vector3(x, 4.8, z), texto: "casa" });
   });
 
   // Andenes (terrazas de cultivo) al fondo
@@ -144,7 +148,122 @@ export function crearMundo(escena: Scene) {
   }
   void k;
 
-  return { mallas, choques, leibles };
+  // Cielo con degradado (cúpula) y nubes que pasan
+  const cieloMat = new StandardMaterial("m-cielo", escena);
+  const cieloTx = new DynamicTexture("tx-cielo", { width: 8, height: 256 }, escena, false);
+  const cc = cieloTx.getContext() as unknown as CanvasRenderingContext2D;
+  const deg = cc.createLinearGradient(0, 0, 0, 256);
+  deg.addColorStop(0, "#3d8fd6");
+  deg.addColorStop(0.45, "#8fd0f4");
+  deg.addColorStop(0.62, "#ffe7b8");
+  deg.addColorStop(1, "#ffe7b8");
+  cc.fillStyle = deg;
+  cc.fillRect(0, 0, 8, 256);
+  cieloTx.update();
+  cieloMat.emissiveTexture = cieloTx;
+  cieloMat.disableLighting = true;
+  cieloMat.backFaceCulling = false;
+  cieloMat.fogEnabled = false;
+  const cupula = MeshBuilder.CreateSphere("cielo", { diameter: 190, segments: 16 }, escena);
+  cupula.material = cieloMat;
+  cupula.isPickable = false;
+  cupula.infiniteDistance = true;
+
+  const blancoNube = material(escena, "#ffffff", 0);
+  blancoNube.emissiveColor = new Color3(0.75, 0.78, 0.82);
+  const nubes: Mesh[] = [];
+  for (let i = 0; i < 9; i++) {
+    const partes: Mesh[] = [];
+    for (let j = 0; j < 4; j++) {
+      const b = MeshBuilder.CreateSphere("nube", { diameter: 4 + azar(i * 7 + j) * 3, segments: 8 }, escena);
+      b.position.set(j * 2.4 - 3.6, azar(i + j * 3) * 1.2, azar(j + i) * 1.5);
+      b.scaling.y = 0.55;
+      partes.push(b);
+    }
+    const nube = Mesh.MergeMeshes(partes, true)!;
+    nube.name = "nube";
+    nube.material = blancoNube;
+    nube.position.set(-60 + i * 15, 26 + azar(i * 2) * 8, 20 + azar(i * 5) * 40 - 20);
+    nubes.push(nube);
+  }
+  escena.onBeforeRenderObservable.add(() => {
+    const dt = escena.getEngine().getDeltaTime() / 1000;
+    for (const n of nubes) {
+      n.position.x += dt * 1.2;
+      if (n.position.x > 75) n.position.x = -75;
+    }
+  });
+
+  // Flores de colores en el pasto (unidas por color para que el celular dibuje poco)
+  for (const color of ["#ff5d8f", "#ffd166", "#ffffff", "#b388ff"]) {
+    const grupo: Mesh[] = [];
+    for (let i = 0; i < 26; i++) {
+      const sem = i * 13 + color.charCodeAt(1);
+      const angulo = azar(sem) * Math.PI * 2;
+      const distancia = 10.8 + azar(sem + 1) * 14;
+      const x = Math.sin(angulo) * distancia;
+      const z = Math.cos(angulo) * distancia;
+      if (Math.abs(x) < 1.8 || Math.abs(z) < 1.8) continue;
+      const flor = MeshBuilder.CreateSphere("flor", { diameter: 0.28, segments: 4 }, escena);
+      flor.position.set(x, 0.14, z);
+      grupo.push(flor);
+    }
+    const flores = Mesh.MergeMeshes(grupo, true);
+    if (flores) {
+      flores.name = "flor";
+      flores.material = material(escena, color, 0.2);
+      mallas.push(flores);
+    }
+  }
+
+  // Glitches del Bug Ch'aqwa: cubos morados que desordenan el código del pueblo
+  const glitches: Mesh[] = [];
+  const morado = material(escena, "#8b3dff", 0.4);
+  morado.emissiveColor = Color3.FromHexString("#5b1fd1");
+  for (let i = 0; i < 7; i++) {
+    const g = MeshBuilder.CreateBox("glitch", { size: 0.35 + azar(i + 40) * 0.3 }, escena);
+    g.material = morado;
+    glitches.push(g);
+  }
+  let t = 0;
+  escena.onBeforeRenderObservable.add(() => {
+    t += escena.getEngine().getDeltaTime() / 1000;
+    glitches.forEach((g, i) => {
+      const a = t * (0.6 + i * 0.07) + i;
+      g.position.set(Math.sin(a) * (3 + (i % 3) * 0.6), 1.2 + Math.sin(t * 2 + i) * 0.6 + (i % 2), Math.cos(a) * (3 + (i % 3) * 0.6));
+      g.rotation.set(t * 1.3 + i, t * 0.9, t * 0.5 * i);
+      // Parpadeo "glitch"
+      g.isVisible = g.metadata !== "oculto" && Math.sin(t * 9 + i * 3) > -0.85;
+    });
+  });
+
+  const gris = material(escena, "#7d7d85");
+  const rojo = material(escena, "#b8432f");
+  const azul = material(escena, "#2f6fd1");
+  const verde = material(escena, "#3f8f3a");
+  const coloresTecho: Record<string, typeof rojo> = { gris, rojo, azul, verde };
+  const intiOro = inti.material;
+  const intiApagado = material(escena, "#6f6a62");
+
+  const control = {
+    /** fuente.agua = True / False */
+    agua(hay: boolean) {
+      agua.isVisible = hay;
+      inti.material = hay ? intiOro : intiApagado;
+      sol.material = hay ? material(escena, "#ffd166", 0.5) : intiApagado;
+    },
+    /** casa.techo = "rojo" | "gris" | ... */
+    techo(color: string) {
+      const mat = coloresTecho[color] ?? gris;
+      for (const tec of techos) tec.material = mat;
+    },
+    /** Muestra u oculta los glitches del Bug */
+    bug(visible: boolean) {
+      for (const g of glitches) g.metadata = visible ? null : "oculto";
+    },
+  };
+
+  return { mallas, choques, leibles, control, glitches, cupula, nubes };
 }
 
 /** Empuja la posición fuera de los objetos sólidos y dentro del límite del mapa. */

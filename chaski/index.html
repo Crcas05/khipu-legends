@@ -4,42 +4,78 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#1d1a39">
-  <title>Chaski Runes · Prueba 3D</title>
+  <meta name="description" content="Chaski Runes: aprende Python y SQL jugando en los Andes.">
+  <title>Chaski Runes · Guardianes del Código</title>
 </head>
 <body>
   <canvas id="lienzo" touch-action="none"></canvas>
-  <div id="etiquetas" aria-hidden="true"></div>
+  <div id="etiquetas"></div>
 
-  <!-- Portada de la prueba -->
+  <!-- Portada -->
   <section id="portada">
     <div class="logo">
       <span class="logo-1">CHASKI</span>
       <span class="logo-2">RUNES</span>
-      <span class="logo-sub">Guardianes del Código</span>
+      <span class="logo-sub">Aprende Python y SQL mientras juegas</span>
     </div>
-    <p class="nota">Fase 0 · Prueba técnica 3D</p>
-    <p class="explica">Camina por la plaza y fíjate si el juego se mueve fluido en tu celular. Arriba a la izquierda verás cuántos cuadros por segundo (FPS) logra.</p>
-    <button id="boton-jugar" class="boton-oro">▶ JUGAR</button>
+    <div class="fila-botones">
+      <button id="boton-jugar" class="boton-oro">▶ JUGAR</button>
+      <button id="boton-nueva" class="boton-secundario" hidden>Nueva partida</button>
+    </div>
+    <p class="nota">Temporada 1 · Misión 1 · Episodio 1</p>
   </section>
 
-  <!-- Interfaz -->
-  <div class="panel insignia">CHASKI RUNES <small>· Fase 0</small></div>
-  <div class="panel medidor">
-    <span id="fps" data-nivel="bien">— FPS</span>
-    <span class="calidades">
+  <section id="seleccion" class="desplazable" hidden></section>
+
+  <!-- Interfaz del juego -->
+  <div id="hud" hidden>
+    <div class="panel objetivo" id="objetivo"><span class="objetivo-icono">🎯</span><span id="objetivo-texto"></span></div>
+    <div class="chips">
+      <span class="chip" title="Nivel">⭐ <b id="hud-nivel">1</b></span>
+      <span class="chip" id="chip-kallpa" title="Kallpa (fuerza)">⚡ <b id="hud-kallpa">0</b></span>
+      <button class="chip" id="chip-simi" title="Simi Qillqa: palabras, nudos e insignias">📖 <b id="hud-palabras">0</b></button>
+      <button class="chip boton-ajustes" id="boton-ajustes" aria-label="Ajustes">⚙</button>
+    </div>
+  </div>
+
+  <div class="panel ajustes" id="ajustes" hidden>
+    <h3>Ajustes</h3>
+    <p>Gráficos: <span id="fps" data-nivel="bien">— FPS</span></p>
+    <div class="calidades">
       <button data-calidad="bajo">Bajo</button>
       <button data-calidad="medio">Medio</button>
       <button data-calidad="alto">Alto</button>
-    </span>
+    </div>
+    <button class="boton-secundario" id="boton-sonido">🔊 Sonido: sí</button>
+    <button class="boton-secundario" id="boton-pantalla">⛶ Pantalla completa</button>
+    <button class="boton-secundario peligro" id="boton-reiniciar">↺ Empezar de nuevo</button>
+    <button class="boton-oro" id="cerrar-ajustes">Volver al juego</button>
   </div>
-  <button class="panel boton-pantalla" id="boton-pantalla" aria-label="Pantalla completa">⛶</button>
+
   <div class="aviso" id="aviso" hidden></div>
+  <div class="logro" id="logro" hidden></div>
+
+  <div id="dialogo" hidden>
+    <div id="dialogo-retrato"></div>
+    <div class="dialogo-cuerpo">
+      <b id="dialogo-nombre"></b>
+      <p id="dialogo-texto"></p>
+      <span class="dialogo-seguir">toca para seguir ▸</span>
+    </div>
+  </div>
 
   <div id="zona-joystick"></div>
   <div id="joystick"><div id="perilla"></div></div>
-  <button id="boton-accion" aria-label="Abrir el Ojo">👁<br>OJO</button>
+  <div class="botones-accion" id="botones-accion" hidden>
+    <button id="boton-hablar" class="boton-redondo hablar" hidden>💬<br>HABLAR</button>
+    <button id="boton-taller" class="boton-redondo taller" hidden>📜<br>TALLER</button>
+    <button id="boton-accion" class="boton-redondo ojo" aria-label="Abrir el Ojo">👁<br>OJO</button>
+  </div>
 
-  <div id="girar"><div class="girar-icono">📱↻</div><p>Gira tu celular para jugar en horizontal</p></div>
+  <div id="reparar" class="capa" hidden></div>
+  <div id="taller" class="capa" hidden></div>
+  <div id="nivel" class="capa" hidden></div>
+  <div id="simi" class="capa" hidden></div>
 
   <script type="module" src="/src/main.ts"></script>
 </body>

@@ -25,7 +25,7 @@ export function material(escena: Scene, hex: string, brillo = 0.08): StandardMat
   return m;
 }
 
-function pieza(m: Mesh, padre: TransformNode, mat: StandardMaterial, x = 0, y = 0, z = 0): Mesh {
+export function pieza(m: Mesh, padre: TransformNode, mat: StandardMaterial, x = 0, y = 0, z = 0): Mesh {
   m.parent = padre;
   m.position.set(x, y, z);
   m.material = mat;
@@ -33,110 +33,10 @@ function pieza(m: Mesh, padre: TransformNode, mat: StandardMaterial, x = 0, y = 
 }
 
 // ---------------------------------------------------------------------------
-// El Chaski
-// ---------------------------------------------------------------------------
-export class Chaski {
-  raiz: TransformNode;
-  private cuerpo: TransformNode;
-  private piernaI: TransformNode;
-  private piernaD: TransformNode;
-  private brazoI: TransformNode;
-  private brazoD: TransformNode;
-  private tiempo = 0;
-  private angulo = 0;
-  mallas: Mesh[] = [];
-
-  constructor(escena: Scene) {
-    const piel = material(escena, "#c68a5a");
-    const rojo = material(escena, "#d7192f");
-    const oro = material(escena, "#f5b83d");
-    const turquesa = material(escena, "#1fa596");
-    const oscuro = material(escena, "#3a2416");
-    const negro = material(escena, "#161616", 0.6);
-    const blanco = material(escena, "#ffffff", 0.9);
-    const crema = material(escena, "#f4ead6");
-
-    this.raiz = new TransformNode("chaski", escena);
-    this.cuerpo = new TransformNode("chaski-cuerpo", escena);
-    this.cuerpo.parent = this.raiz;
-    const m = (x: Mesh) => (this.mallas.push(x), x);
-
-    // Piernas (con pivote en la cadera para animarlas)
-    const pierna = (lado: number) => {
-      const cadera = new TransformNode("cadera", escena);
-      cadera.parent = this.cuerpo;
-      cadera.position.set(0.17 * lado, 0.62, 0);
-      m(pieza(MeshBuilder.CreateCapsule("pierna", { radius: 0.14, height: 0.62, tessellation: 8 }, escena), cadera, oscuro, 0, -0.3, 0));
-      m(pieza(MeshBuilder.CreateBox("pie", { width: 0.24, height: 0.12, depth: 0.34 }, escena), cadera, oscuro, 0, -0.6, 0.05));
-      return cadera;
-    };
-    this.piernaI = pierna(-1);
-    this.piernaD = pierna(1);
-
-    // Poncho con franjas
-    m(pieza(MeshBuilder.CreateCylinder("poncho", { height: 0.85, diameterTop: 0.62, diameterBottom: 1.05, tessellation: 8 }, escena), this.cuerpo, rojo, 0, 1.0, 0));
-    m(pieza(MeshBuilder.CreateCylinder("franja", { height: 0.12, diameterTop: 0.9, diameterBottom: 0.95, tessellation: 8 }, escena), this.cuerpo, oro, 0, 0.82, 0));
-    m(pieza(MeshBuilder.CreateCylinder("franja2", { height: 0.07, diameterTop: 1.03, diameterBottom: 1.06, tessellation: 8 }, escena), this.cuerpo, turquesa, 0, 0.6, 0));
-
-    // Brazos (pivote en el hombro)
-    const brazo = (lado: number) => {
-      const hombro = new TransformNode("hombro", escena);
-      hombro.parent = this.cuerpo;
-      hombro.position.set(0.4 * lado, 1.32, 0);
-      m(pieza(MeshBuilder.CreateCapsule("brazo", { radius: 0.11, height: 0.58, tessellation: 8 }, escena), hombro, piel, 0, -0.26, 0));
-      return hombro;
-    };
-    this.brazoI = brazo(-1);
-    this.brazoD = brazo(1);
-    // Pututu (caracola) en la mano derecha
-    const pututu = m(pieza(MeshBuilder.CreateCylinder("pututu", { height: 0.3, diameterTop: 0, diameterBottom: 0.16, tessellation: 8 }, escena), this.brazoD, crema, 0, -0.56, 0.1));
-    pututu.rotation.x = Math.PI / 2;
-
-    // Cabeza grande (proporción chibi)
-    m(pieza(MeshBuilder.CreateSphere("cabeza", { diameter: 1.05, segments: 12 }, escena), this.cuerpo, piel, 0, 1.9, 0));
-    for (const lado of [-1, 1]) {
-      m(pieza(MeshBuilder.CreateSphere("ojo", { diameter: 0.17, segments: 8 }, escena), this.cuerpo, negro, 0.19 * lado, 1.92, 0.45));
-      m(pieza(MeshBuilder.CreateSphere("brillo", { diameter: 0.06, segments: 6 }, escena), this.cuerpo, blanco, 0.19 * lado + 0.03, 1.96, 0.52));
-    }
-    m(pieza(MeshBuilder.CreateBox("boca", { width: 0.16, height: 0.04, depth: 0.04 }, escena), this.cuerpo, oscuro, 0, 1.7, 0.5));
-    // Cintillo rojo y chullo
-    m(pieza(MeshBuilder.CreateTorus("cintillo", { diameter: 1.02, thickness: 0.09, tessellation: 20 }, escena), this.cuerpo, rojo, 0, 2.06, 0));
-    m(pieza(MeshBuilder.CreateCylinder("chullo", { height: 0.62, diameterTop: 0.12, diameterBottom: 1.0, tessellation: 12 }, escena), this.cuerpo, oro, 0, 2.42, 0));
-    m(pieza(MeshBuilder.CreateCylinder("banda", { height: 0.1, diameterTop: 0.78, diameterBottom: 0.84, tessellation: 12 }, escena), this.cuerpo, turquesa, 0, 2.32, 0));
-    m(pieza(MeshBuilder.CreateCylinder("banda2", { height: 0.08, diameterTop: 0.5, diameterBottom: 0.55, tessellation: 12 }, escena), this.cuerpo, rojo, 0, 2.55, 0));
-    m(pieza(MeshBuilder.CreateSphere("pompon", { diameter: 0.24, segments: 8 }, escena), this.cuerpo, rojo, 0, 2.78, 0));
-    for (const lado of [-1, 1]) {
-      const orejera = m(pieza(MeshBuilder.CreateBox("orejera", { width: 0.1, height: 0.42, depth: 0.26 }, escena), this.cuerpo, oro, 0.5 * lado, 1.86, 0));
-      orejera.rotation.z = 0.15 * lado;
-    }
-  }
-
-  /** dx, dz: dirección de movimiento (-1 a 1). dt en segundos. */
-  actualizar(dx: number, dz: number, dt: number) {
-    const fuerza = Math.min(1, Math.hypot(dx, dz));
-    if (fuerza > 0.05) {
-      const objetivo = Math.atan2(dx, dz);
-      let diferencia = objetivo - this.angulo;
-      diferencia = Math.atan2(Math.sin(diferencia), Math.cos(diferencia));
-      this.angulo += diferencia * Math.min(1, dt * 12);
-      this.raiz.rotation.y = this.angulo;
-      this.tiempo += dt * (6 + 6 * fuerza);
-    } else {
-      this.tiempo += dt * 2;
-    }
-    const paso = fuerza > 0.05 ? Math.sin(this.tiempo) * 0.75 * fuerza : 0;
-    this.piernaI.rotation.x = paso;
-    this.piernaD.rotation.x = -paso;
-    this.brazoI.rotation.x = -paso * 0.8;
-    this.brazoD.rotation.x = paso * 0.8;
-    this.cuerpo.position.y = fuerza > 0.05 ? Math.abs(Math.sin(this.tiempo)) * 0.09 : Math.sin(this.tiempo) * 0.02;
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Yaru, la llama
 // ---------------------------------------------------------------------------
 export function crearLlama(escena: Scene, x: number, z: number) {
+  // (Yaru será héroe jugable en la Misión 4)
   const lana = material(escena, "#f3ebdc");
   const manta = material(escena, "#c8102e");
   const franja = material(escena, "#1fa596");
