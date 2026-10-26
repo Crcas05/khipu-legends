@@ -10,6 +10,7 @@ interface Pyodide {
   setStdout(o: { batched: (t: string) => void }): void;
   setStderr(o: { batched: (t: string) => void }): void;
   setStdin(o: { error: boolean }): void;
+  loadPackagesFromImports(codigo: string, opciones?: { messageCallback?: (m: string) => void; errorCallback?: (m: string) => void }): Promise<unknown>;
   globals: { get(nombre: string): () => { destroy(): void } };
 }
 
@@ -30,7 +31,7 @@ async function cargar() {
 function analizarError(texto: string) {
   const lineas = String(texto).trim().split("\n");
   const ultima = lineas[lineas.length - 1] || "";
-  const coincide = ultima.match(/^(\w+(?:Error|Exception|Warning)?):\s*(.*)$/);
+  const coincide = ultima.match(/^(?:[\w]+\.)*(\w+(?:Error|Exception|Warning)?):\s*(.*)$/);
   let linea: number | null = null;
   for (const l of lineas) {
     const m = l.match(/File "<exec>", line (\d+)/);
@@ -47,6 +48,8 @@ self.onmessage = async (evento: MessageEvent<{ id: number; codigo: string }>) =>
   pyodide.setStderr({ batched: () => {} });
   const espacio = pyodide.globals.get("dict")();
   try {
+    // Paquetes como sqlalchemy se descargan solo la primera vez que se usan
+    if (/^\s*(import|from)\s+sqlalchemy/m.test(codigo)) await pyodide.loadPackagesFromImports(codigo, { messageCallback: () => {}, errorCallback: () => {} });
     await pyodide.runPythonAsync(codigo, { globals: espacio });
     enviar({ tipo: "resultado", id, ok: true, salida });
   } catch (e) {

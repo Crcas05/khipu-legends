@@ -413,3 +413,52 @@ body.vertical #mapa { width: 96px; height: 96px; }
 .ficha small { color: #9aa6e8; }
 .ficha p { font-size: 14px; line-height: 1.45; }
 body.en-valle .botones-accion { flex-direction: column; }
+
+/* ---------- Mapa del Perú ---------- */
+#mapa-peru { z-index: 34; }
+.mapa-marco { width: min(1000px, 100%); max-height: calc(100dvh - 20px); display: grid; grid-template-rows: auto 1fr; background: #151a3c; border: 3px solid var(--oro); border-radius: 18px; overflow: hidden; position: relative; }
+.mapa-cabecera { display: flex; justify-content: space-between; align-items: center; padding: 10px 50px 10px 16px; background: #241a4a; }
+.mapa-cabecera h2 { color: var(--oro); font-size: 20px; }
+.mapa-cabecera p { font-size: 13px; color: #c9d2ff; }
+.mapa-cuerpo { display: grid; grid-template-columns: 1fr 280px; min-height: 0; }
+.mapa-lienzo { position: relative; aspect-ratio: 3 / 4; max-height: calc(100dvh - 90px); margin: 10px auto; width: auto; height: calc(100dvh - 110px); max-width: 100%; border-radius: 14px; overflow: hidden; box-shadow: inset 0 0 0 3px #4a3a1a; }
+.mapa-fondo, .mapa-camino, .mapa-arte { position: absolute; inset: 0; width: 100%; height: 100%; }
+.mapa-arte { object-fit: cover; }
+.mapa-fondo .region { font: 900 4px system-ui; fill: rgba(40, 30, 10, .45); letter-spacing: .3px; }
+.mapa-camino polyline { fill: none; stroke: #fff6d8; stroke-width: .8; stroke-dasharray: 2 1.5; opacity: .9; }
+.mapa-nodo { position: absolute; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 2px; border: 0; background: none; color: #fff; padding: 0; }
+.mapa-nodo .num { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 15px; background: radial-gradient(#ffd166, #d98a12); color: #3a1d06; border: 3px solid #fff; box-shadow: 0 3px 0 rgba(0,0,0,.4); }
+.mapa-nodo .nombre { font-size: 11px; font-weight: 800; background: rgba(14,18,42,.85); padding: 1px 6px; border-radius: 6px; white-space: nowrap; }
+.mapa-nodo.hecha .num { background: radial-gradient(#7dffb0, #1f8f5e); color: #062a17; }
+.mapa-nodo.actual .num { animation: late 1s infinite; box-shadow: 0 0 0 6px rgba(255,209,102,.4); }
+.mapa-nodo.bloqueada .num { background: #4a4f6a; color: #fff; font-size: 13px; }
+.mapa-nodo.bloqueada .nombre { opacity: .6; }
+.mapa-nodo.elegida .num { outline: 3px solid var(--turquesa); outline-offset: 2px; }
+.mapa-detalle { padding: 16px; display: grid; gap: 10px; align-content: start; border-left: 2px solid #2b3a8c; overflow: auto; }
+.mapa-detalle h3 { color: var(--oro2); font-size: 22px; }
+.mapa-cultura, .mapa-temas { font-size: 14px; line-height: 1.4; }
+@media (max-width: 760px), (max-height: 460px) {
+  .mapa-cuerpo { grid-template-columns: 1fr; }
+  .mapa-lienzo { height: auto; width: min(100%, 60dvh); max-height: none; }
+  .mapa-detalle { border-left: 0; border-top: 2px solid #2b3a8c; }
+}
+@media (max-height: 460px) {
+  .mapa-cuerpo { grid-template-columns: 1fr 260px; overflow: auto; }
+  .mapa-lienzo { width: auto; height: calc(100dvh - 90px); }
+  .mapa-detalle { border-top: 0; border-left: 2px solid #2b3a8c; }
+}
+
+/* ---------- Lecciones y programa ---------- */
+.leccion-modulo { color: var(--turquesa); font-weight: 800; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+.sello-ganado { text-align: center; font-weight: 800; color: var(--oro2); }
+.programa-nivel { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.programa-nivel b { width: 100%; color: #c9d2ff; font-size: 13px; }
+.modulo { font-size: 12px; background: #222a5e; border-radius: 8px; padding: 4px 8px; opacity: .55; }
+.modulo.ganado { opacity: 1; background: #2f3a1e; border: 1px solid var(--oro); }
+.chips { flex-wrap: wrap; justify-content: flex-end; max-width: calc(100vw - 16px); }
+.mapa-nodo .nombre { display: none; }
+.mapa-nodo.actual .nombre, .mapa-nodo.elegida .nombre { display: block; }
+.mapa-nodo.elegida, .mapa-nodo.actual { z-index: 2; }
+.consola div { white-space: pre; }
+.consola { overflow-x: auto; }
+.portada-arte { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -1; opacity: .55; }

@@ -337,7 +337,7 @@ export class ValleJuego {
         await abrirBloques(BLOQUES_RIO);
         return true;
       case "quenua":
-        return abrirTaller(RETO_QUENUAS);
+        return !!(await abrirTaller(RETO_QUENUAS));
       case "condor": {
         // if / else: primero predecir, luego completar la comparación, al final la teoría
         let c = tarjeta(`

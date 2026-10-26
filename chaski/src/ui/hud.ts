@@ -18,9 +18,17 @@ export function aviso(texto: string, ms = 3800) {
   temporizador = window.setTimeout(() => (a.hidden = true), ms);
 }
 
+let objetivoZona: string | null = null;
+/** En las zonas del viaje, el objetivo lo pone la zona (null = el de la historia). */
+export function fijarObjetivo(texto: string | null) {
+  objetivoZona = texto;
+  actualizarHud();
+}
+
 export function actualizarHud() {
-  document.getElementById("objetivo-texto")!.textContent = OBJETIVOS[estado.paso] ?? "";
-  document.getElementById("objetivo")!.hidden = !OBJETIVOS[estado.paso];
+  const objetivo = objetivoZona ?? OBJETIVOS[estado.paso] ?? "";
+  document.getElementById("objetivo-texto")!.textContent = objetivo;
+  document.getElementById("objetivo")!.hidden = !objetivo;
   document.getElementById("hud-kallpa")!.textContent = String(estado.kallpa);
   document.getElementById("hud-nivel")!.textContent = String(estado.nivel);
   document.getElementById("hud-palabras")!.textContent = String(estado.palabras.length);

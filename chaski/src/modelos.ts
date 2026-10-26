@@ -168,5 +168,19 @@ export function ponerMontera(escena: Scene, cabeza: TransformNode, escala = 1): 
   ala.material = copa.material = rojo;
   banda.material = oro;
   for (const m of [ala, copa, banda]) m.parent = raiz;
-  return [ala, copa, banda];
+  // Dos trenzas largas con lazos de colores
+  const pelo = material(escena, "#1c1410", 0.3);
+  const piezas: Mesh[] = [ala, copa, banda];
+  for (const lado of [-1, 1]) {
+    const trenza = MeshBuilder.CreateCapsule("trenza", { radius: 0.11, height: 1.25, tessellation: 8 }, escena);
+    trenza.parent = raiz;
+    trenza.position.set(0.42 * lado, -1.05, -0.05);
+    trenza.material = pelo;
+    const lazo = MeshBuilder.CreateSphere("lazo", { diameter: 0.18, segments: 8 }, escena);
+    lazo.parent = raiz;
+    lazo.position.set(0.42 * lado, -1.72, -0.05);
+    lazo.material = material(escena, lado < 0 ? "#d6336c" : "#1fa596");
+    piezas.push(trenza, lazo);
+  }
+  return piezas;
 }

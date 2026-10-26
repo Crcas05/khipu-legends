@@ -13,6 +13,7 @@
 
   <!-- Portada -->
   <section id="portada">
+    <img class="portada-arte" src="arte/portada.jpg" alt="" onerror="this.remove()">
     <pre class="portada-codigo" id="portada-codigo"></pre>
     <div class="logo">
       <span class="logo-1">CHASKI</span>
@@ -36,6 +37,7 @@
       <span class="chip" title="Nivel">⭐ <b id="hud-nivel">1</b></span>
       <span class="chip" id="chip-kallpa" title="Kallpa (fuerza)">⚡ <b id="hud-kallpa">0</b></span>
       <button class="chip" id="chip-simi" title="Simi Qillqa: palabras, nudos e insignias">📖 <b id="hud-palabras">0</b></button>
+      <button class="chip" id="chip-mapa" title="Mapa del Perú (M)" hidden>🗺</button>
       <button class="chip boton-ajustes" id="boton-ajustes" aria-label="Ajustes">⚙</button>
     </div>
   </div>
@@ -43,7 +45,7 @@
   <div id="hud-valle" hidden>
     <canvas id="mapa" width="160" height="160"></canvas>
     <div class="valle-datos">
-      <span>🌿 Naturaleza <b id="valle-progreso">0/6</b></span>
+      <span><span id="valle-titulo">🌿 Naturaleza</span> <b id="valle-progreso">0/6</b></span>
       <code id="valle-inventario">inventario = {}</code>
       <div class="barra mini"><i id="vida-valle"></i></div>
     </div>
@@ -110,6 +112,7 @@
   <div id="taller" class="capa" hidden></div>
   <div id="nivel" class="capa" hidden></div>
   <div id="simi" class="capa" hidden></div>
+  <div id="mapa-peru" class="capa" hidden></div>
 
   <script type="module" src="/src/main.ts"></script>
 </body>

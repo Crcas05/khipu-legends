@@ -37,7 +37,7 @@ export function abrirBloques(r: RetoBloques): Promise<void> {
       <header class="taller-cabecera"><span>🧩 ${escapar(r.titulo)}</span><span id="bloques-estado" class="estado-python"></span></header>
       <div class="bloques-cuerpo">
         <div class="prologo-tuki">${retrato(r.quien, 44)}<p>${r.mision}</p></div>
-        <p class="bloques-ayuda">Toca las líneas en orden para armar tu runa. Toca una línea armada para devolverla. ⚠ Hay líneas con errores.</p>
+        <p class="bloques-ayuda"><b>👆 Aquí no se escribe: toca las líneas en orden</b> para armar tu runa. Toca una línea armada para devolverla. ⚠ Algunas líneas tienen errores.</p>
         <div class="bloques-runa" id="bloques-runa"></div>
         <div class="bloques-bandeja" id="bloques-bandeja"></div>
         <div class="fila-botones">

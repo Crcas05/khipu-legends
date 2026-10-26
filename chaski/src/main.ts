@@ -26,7 +26,7 @@ import { entrada, iniciarControles } from "./controles";
 import { estado, guardar, hayPartida, reiniciar, yaPaso, enSelva, enValle, type Paso } from "./estado";
 import { BLOQUES_1, MAMA_TALLER, RETO_TALLER, INTRO, MAMA_1, FUENTE_LISTA, TECHO_LISTO, MAMA_2, FINAL, REPARAR_FUENTE, REPARAR_TECHO, APRENDIDO } from "./datos/episodio1";
 import { hablar, dialogoAbierto } from "./ui/dialogo";
-import { aviso, actualizarHud, ganarKallpa } from "./ui/hud";
+import { aviso, actualizarHud, ganarKallpa, fijarObjetivo } from "./ui/hud";
 import { abrirReparacion } from "./ui/reparar";
 import { abrirTaller } from "./ui/taller";
 import { elegirHeroe, nuevoNivel, proximamente } from "./ui/pantallas";
@@ -35,6 +35,11 @@ import { crearSelva, PIEDRAS, PUERTA, AMARU_POS, INICIO_SELVA, LIMITE_SELVA } fr
 import { Jefe, Batalla } from "./batalla";
 import { crearValle, SITIOS, INICIO_VALLE, LIMITE_VALLE, type Sitio } from "./valle";
 import { ValleJuego } from "./valleJuego";
+import { ZonaJuego } from "./zonaJuego";
+import { INICIO_ZONA, LIMITE_ZONA } from "./zonaMundo";
+import { ZONAS, type Zona } from "./datos/zonas";
+import type { SitioZona } from "./datos/zonas";
+import { abrirMapa } from "./ui/mapa";
 import { INTRO_VALLE, FIN_VALLE, APRENDIDO_VALLE, codigoSitio } from "./datos/valle";
 import { abrirBloques } from "./ui/bloques";
 import { BLOQUES_2, LLEGADA, AMARU_1, ECOS_LISTOS, ANTES_BATALLA, VICTORIA, APRENDIDO_2, RETO_RAYO } from "./datos/episodio2";
@@ -115,11 +120,18 @@ for (let i = 0; i < 4; i++) {
 }
 const jefe = new Jefe(escena);
 const valle = crearValle(escena);
-type Region = "plaza" | "selva" | "valle";
+// Killa (guerrera de la luna) y Yaru (la llama) acompañan en las zonas del viaje
+const killa = new Chaski(escena, true);
+killa.raiz.setEnabled(false);
+const yaruGuia = crearLlama(escena, 0, 0);
+yaruGuia.raiz.scaling.setAll(0.8);
+yaruGuia.raiz.setEnabled(false);
+let guiaActual: "amaru" | "killa" | "yaru" | null = null;
+type Region = "plaza" | "selva" | "valle" | "zona";
 let region: Region = "plaza";
 let personajes: Mesh[] = [];
 function listarPersonajes() {
-  personajes = [...chaski.mallas, ...tuki.mallas, ...yaru.mallas, ...mama.mallas, ...amaru.mallas];
+  personajes = [...chaski.mallas, ...tuki.mallas, ...yaru.mallas, ...mama.mallas, ...amaru.mallas, ...killa.mallas, ...yaruGuia.mallas];
 }
 listarPersonajes();
 
@@ -142,6 +154,7 @@ for (const m of [asta, punta]) {
   m.isPickable = false;
 }
 function destinoGuia(): Vector3 | null {
+  if (region === "zona") return zonaJuego.destino();
   if (region === "valle") {
     // La flecha apunta al rescate pendiente más cercano (la puerta, solo al final)
     const p = chaski.raiz.position;
@@ -446,6 +459,7 @@ async function hablarConMama() {
         await hablar(FINAL);
         valores.animo = "feliz";
         estado.nivel = Math.max(estado.nivel, 2);
+        estado.sellos["B1 Variables y tipos"] = Math.max(estado.sellos["B1 Variables y tipos"] ?? 0, 2);
         avanzar("completo");
         desbloquear("episodio1");
         chaski.festejar();
@@ -490,7 +504,13 @@ async function viajarA(destino: Region) {
   await new Promise((r) => window.setTimeout(r, 450));
   if (ojoAbierto) alternarOjo(false);
   if (region === "valle") valleJuego.salir();
+  if (region === "zona" && destino !== "zona") {
+    zonaJuego.salir();
+    estado.zonaActual = "";
+    guardar();
+  }
   region = destino;
+  const zonaActiva = destino === "zona";
   const selvaActiva = destino === "selva";
   const plazaActiva = destino === "plaza";
   const valleActivo = destino === "valle";
@@ -503,15 +523,23 @@ async function viajarA(destino: Region) {
   else if (valores.agua) chorro.start();
   selva.raiz.setEnabled(selvaActiva);
   valle.raiz.setEnabled(valleActivo);
-  amaru.raiz.setEnabled(!plazaActiva);
-  if (valleActivo) amaru.raiz.position.copyFrom(INICIO_VALLE.add(new Vector3(2, 0, -1)));
+  const zona = zonaActiva ? ZONAS.find((z) => z.id === estado.zonaActual) ?? null : null;
+  guiaActual = valleActivo ? "amaru" : zona ? (zona.guia as "amaru" | "killa" | "yaru") : null;
+  amaru.raiz.setEnabled(selvaActiva || guiaActual === "amaru");
+  killa.raiz.setEnabled(guiaActual === "killa");
+  yaruGuia.raiz.setEnabled(guiaActual === "yaru");
+  const inicio = selvaActiva ? INICIO_SELVA : valleActivo ? INICIO_VALLE : zonaActiva ? INICIO_ZONA : new Vector3(0, 0, -6);
+  if (guiaActual) nodoGuia()!.position.copyFrom(inicio.add(new Vector3(2, 0, -1)));
   else amaru.raiz.position.copyFrom(AMARU_POS);
-  chaski.raiz.position.copyFrom(selvaActiva ? INICIO_SELVA : valleActivo ? INICIO_VALLE : new Vector3(0, 0, -6));
+  chaski.raiz.position.copyFrom(inicio);
   if (valleActivo) valleJuego.entrar();
+  if (zona) zonaJuego.entrar(zona);
+  fijarObjetivo(zona ? objetivoDeZona(zona) : null);
   camara.target.copyFrom(chaski.raiz.position);
-  escena.fogColor = selvaActiva ? new Color3(0.55, 0.72, 0.55) : new Color3(0.72, 0.86, 0.95);
-  escena.fogStart = selvaActiva ? 28 : 45;
-  escena.fogEnd = selvaActiva ? 70 : 95;
+  escena.fogColor = zonaJuego.mundo ? zonaJuego.mundo.niebla : selvaActiva ? new Color3(0.55, 0.72, 0.55) : new Color3(0.72, 0.86, 0.95);
+  escena.fogStart = selvaActiva ? 28 : zona?.ambiente === "nubes" ? 22 : 45;
+  escena.fogEnd = selvaActiva ? 70 : zona?.ambiente === "nubes" ? 60 : 95;
+  $("valle-titulo").textContent = zona ? `${zona.numero}. ${zona.nombre}` : "🌿 Naturaleza";
   sol.intensity = selvaActiva ? 0.9 : 1.05;
   document.body.dataset.region = destino;
   actualizarBotones();
@@ -700,9 +728,63 @@ const valleJuego = new ValleJuego({
       avanzar("completo3");
       desbloquear("valle");
       await nuevoNivel(APRENDIDO_VALLE);
-      await proximamente(4);
+      await irAlMapa();
     }),
 });
+
+// ---------------------------------------------------------------------------
+// Zonas 2–10: el viaje por el Perú
+// ---------------------------------------------------------------------------
+const zonaJuego = new ZonaJuego({
+  escena,
+  jugador: () => chaski.raiz.position,
+  lanzar: () => chaski.lanzar(),
+  golpeado: () => chaski.golpeado(),
+  festejar: () => chaski.festejar(),
+  sacudida,
+  aviso,
+  ganarKallpa,
+  desbloquear,
+  alAvanzar: (z: Zona) => fijarObjetivo(objetivoDeZona(z)),
+  alTerminar: (z: Zona) =>
+    enCalma(async () => {
+      sonido.nivel();
+      await hablar(z.fin);
+      estado.nivel = Math.max(estado.nivel, 4 + z.numero - 1);
+      guardar();
+      desbloquear(`zona-${z.id}`);
+      await nuevoNivel(z.temas.split(" · "));
+      await irAlMapa();
+    }),
+});
+
+function objetivoDeZona(z: Zona) {
+  const hechos = estado.zonas[z.id]?.length ?? 0;
+  return hechos >= z.sitios.length ? `¡${z.nombre} restaurado! Toca 🗺 para seguir el viaje` : `Restaura los altares de ${z.nombre}: ${hechos}/${z.sitios.length} (sigue la flecha)`;
+}
+
+function nodoGuia() {
+  return guiaActual === "amaru" ? amaru.raiz : guiaActual === "killa" ? killa.raiz : guiaActual === "yaru" ? yaruGuia.raiz : null;
+}
+
+/** Abre el mapa del Perú y viaja a la zona elegida. */
+async function irAlMapa() {
+  const destino = await abrirMapa();
+  if (!destino) return;
+  if (destino === "valle") {
+    if (yaPaso("valle")) await viajarA("valle");
+    else await entrarValle();
+    return;
+  }
+  const z = ZONAS.find((x) => x.id === destino);
+  if (!z) return;
+  const primeraVez = !(estado.zonas[z.id]?.length);
+  estado.zonaActual = z.id;
+  guardar();
+  await viajarA("zona");
+  if (primeraVez) await hablar(z.intro);
+  aviso(`🗺 ${z.nombre}: ${z.sitios.length} altares por restaurar. ¡Sigue la flecha!`, 3500);
+}
 
 async function entrarValle() {
   avanzar("valle");
@@ -712,6 +794,7 @@ async function entrarValle() {
 }
 
 let sitioActual: Sitio | null = null;
+let altarActual: SitioZona | null = null;
 function adelanteDeChaski() {
   const a = chaski.raiz.rotation.y;
   return new Vector3(Math.sin(a), 0, Math.cos(a));
@@ -736,6 +819,7 @@ async function hablarConAmaru() {
       case "victoria":
         await hablar(VICTORIA);
         estado.nivel = Math.max(estado.nivel, 3);
+        estado.sellos["B6 Bucle for"] = Math.max(estado.sellos["B6 Bucle for"] ?? 0, 2);
         avanzar("completo2");
         desbloquear("episodio2");
         await nuevoNivel(APRENDIDO_2);
@@ -776,9 +860,12 @@ async function usarTaller() {
 // ---------------------------------------------------------------------------
 let cercaDeMama = false;
 function actualizarBotones() {
-  $("boton-hablar").hidden = !cercaDeMama || ocupado || batalla.activa || region === "valle";
-  $("boton-huaraca").hidden = region !== "valle";
-  $("boton-rescatar").hidden = region !== "valle" || !sitioActual || ocupado;
+  const abierto = region === "valle" || region === "zona";
+  $("boton-hablar").hidden = !cercaDeMama || ocupado || batalla.activa || abierto;
+  $("boton-huaraca").hidden = !abierto;
+  $("boton-rescatar").hidden = !(region === "valle" ? sitioActual : region === "zona" ? altarActual : null) || ocupado;
+  $("boton-rescatar").innerHTML = region === "zona" ? "📘<br>APRENDER" : "🔧<br>RESCATAR";
+  $("chip-mapa").hidden = !yaPaso("victoria") || batalla.activa;
   $("boton-taller").hidden = !(["taller", "final", "completo", "forja", "batalla", "victoria", "completo2"].includes(estado.paso)) || batalla.activa;
   $("boton-accion").hidden = !yaPaso("hablar1");
   const avisar = ["hablar1", "hablar2", "final"].includes(estado.paso);
@@ -789,10 +876,19 @@ iniciarControles();
 $("boton-hablar").addEventListener("click", () => hablarConMama());
 $("boton-huaraca").addEventListener("pointerdown", (e) => {
   e.preventDefault();
-  if (!ocupado && !dialogoAbierto()) valleJuego.disparar(adelanteDeChaski());
+  if (ocupado || dialogoAbierto()) return;
+  if (region === "zona") zonaJuego.disparar(adelanteDeChaski());
+  else valleJuego.disparar(adelanteDeChaski());
+});
+$("chip-mapa").addEventListener("click", () => {
+  sonido.toque();
+  enCalma(irAlMapa);
 });
 $("boton-rescatar").addEventListener("click", () => {
-  if (sitioActual) {
+  if (region === "zona" && altarActual) {
+    const s = altarActual;
+    enCalma(() => zonaJuego.aprender(s));
+  } else if (sitioActual) {
     const s = sitioActual;
     enCalma(() => valleJuego.rescatar(s));
   }
@@ -855,6 +951,12 @@ window.addEventListener("keydown", (e) => {
   if (k === "t" && !$("boton-taller").hidden) enCalma(usarTaller);
   if (k === "q") enCalma(abrirSimiQillqa);
   if (k === "f" && region === "valle") valleJuego.disparar(adelanteDeChaski());
+  if (k === "f" && region === "zona") zonaJuego.disparar(adelanteDeChaski());
+  if (k === "m" && yaPaso("victoria")) enCalma(irAlMapa);
+  if (k === "e" && region === "zona" && altarActual) {
+    const s = altarActual;
+    enCalma(() => zonaJuego.aprender(s));
+  }
   if (k === "e" && region === "valle" && sitioActual) {
     const s = sitioActual;
     enCalma(() => valleJuego.rescatar(s));
@@ -911,24 +1013,37 @@ escena.onBeforeRenderObservable.add(() => {
   pos.z += dz * VELOCIDAD * dt;
   resolverChoques(
     pos,
-    region === "selva" ? selva.choques : region === "valle" ? valle.choques : mundo.choques,
+    region === "selva" ? selva.choques : region === "valle" ? valle.choques : region === "zona" ? zonaJuego.mundo?.choques ?? [] : mundo.choques,
     0.45,
-    region === "selva" ? LIMITE_SELVA : region === "valle" ? LIMITE_VALLE : undefined
+    region === "selva" ? LIMITE_SELVA : region === "valle" ? LIMITE_VALLE : region === "zona" ? LIMITE_ZONA : undefined
   );
-  if (region === "valle") {
-    valleJuego.actualizar(dt, ocupado || dialogoAbierto());
-    // Amaru acompaña al jugador
+  // El guía acompaña al jugador en el viaje
+  const acompanante = nodoGuia();
+  if (acompanante && (region === "valle" || region === "zona")) {
     const meta = pos.add(new Vector3(-1.8, 0, -1.8));
-    const ap = amaru.raiz.position;
+    const ap = acompanante.position;
     const vx = meta.x - ap.x;
     const vz = meta.z - ap.z;
     const dist = Math.hypot(vx, vz);
+    const anim = guiaActual === "killa" ? killa : guiaActual === "amaru" ? amaru : null;
     if (dist > 0.6) {
       const v = Math.min(dist, (dist > 6 ? 7 : 5) * dt);
       ap.x += (vx / dist) * v;
       ap.z += (vz / dist) * v;
-      amaru.actualizar(vx / dist, vz / dist, dt);
-    } else amaru.actualizar(0, 0, dt);
+      if (anim) anim.actualizar(vx / dist, vz / dist, dt);
+      else acompanante.rotation.y = Math.atan2(vx, vz);
+    } else anim?.actualizar(0, 0, dt);
+  }
+  if (region === "zona") {
+    zonaJuego.actualizar(dt, ocupado || dialogoAbierto());
+    const a = jugando && !ocupado ? zonaJuego.sitioCercano() : null;
+    if (a !== altarActual) {
+      altarActual = a;
+      actualizarBotones();
+    }
+  }
+  if (region === "valle") {
+    valleJuego.actualizar(dt, ocupado || dialogoAbierto());
     const s = jugando && !ocupado ? valleJuego.sitioCercano() : null;
     if (s !== sitioActual) {
       sitioActual = s;
@@ -1080,6 +1195,11 @@ async function empezar() {
       avanzar("intro");
     });
   }
+  if (estado.zonaActual && ZONAS.some((z) => z.id === estado.zonaActual)) {
+    await viajarA("zona");
+    aviso("🗺 Sigue tu viaje. Toca 🗺 para ver el mapa del Perú.", 3500);
+    return;
+  }
   if (enValle()) {
     await viajarA("valle");
     if (estado.paso === "valle") aviso("🗺 Sigue rescatando el Valle Sagrado. ¡Mira el mapa!", 3500);
@@ -1148,6 +1268,8 @@ restaurarMundo();
     };
     await vestirChaski(chaski);
     for (const e of ecos) await vestirChaski(e);
+    const mk = await crearModelo(escena, "killa.glb", killa.raiz, 2.7);
+    killa.vestir(mk);
     const ma = await crearModelo(escena, "amaru.glb", amaru.raiz, 2.7);
     amaru.vestir(ma, ma.cabeza ? ponerMontera(escena, ma.cabeza, 0.85) : []);
     listarPersonajes();
@@ -1174,6 +1296,7 @@ if (new URLSearchParams(location.search).has("prueba")) {
     jefe,
     camara,
     amaru,
-    valle: { bugsVivos: () => ({ cerca: valleJuego.bugsCerca() }) },
+    valle: { bugsVivos: () => ({ cerca: region === "zona" ? zonaJuego.bugsCerca() : valleJuego.bugsCerca() }) },
+    zona: () => ({ id: zonaJuego.zona?.id, hechos: estado.zonas[zonaJuego.zona?.id ?? ""] ?? [], sitios: zonaJuego.zona?.sitios.map((s) => [s.id, s.x, s.z]) }),
   };
 }

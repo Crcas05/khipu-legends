@@ -63,7 +63,7 @@ class PythonRunner {
     return this.listo;
   }
 
-  async ejecutar(codigo: string): Promise<Resultado> {
+  async ejecutar(codigo: string, tiempoMaximo = TIEMPO_MAXIMO_MS): Promise<Resultado> {
     await this.iniciar();
     const id = this.siguienteId++;
     return new Promise((resolver) => {
@@ -74,7 +74,7 @@ class PythonRunner {
         this.listo = null;
         this.iniciar().catch(() => {});
         resolver({ ok: false, salida: [], error: { tipo: "Timeout", mensaje: "", linea: null } });
-      }, TIEMPO_MAXIMO_MS);
+      }, /sqlalchemy/.test(codigo) ? Math.max(tiempoMaximo, 90000) : tiempoMaximo);
       this.pendientes.set(id, { resolver, temporizador });
       this.worker!.postMessage({ id, codigo });
     });

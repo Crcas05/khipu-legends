@@ -21,12 +21,19 @@ export interface Estado {
   ultimoDia: string;
   rescates: string[];
   inventario: Record<string, number>;
+  /** Zonas del mapa: sitios completados por zona. */
+  zonas: Record<string, string[]>;
+  /** Sello por módulo del programa: 1 reconoce, 2 aplica, 3 domina. */
+  sellos: Record<string, number>;
+  /** Paso donde quedó cada lección (para retomar). */
+  leccionPaso: Record<string, number>;
+  zonaActual: string;
 }
 
 const CLAVE = "chaski-runes-v1";
 
 function inicial(): Estado {
-  return { heroe: "", nombre: "", paso: "prologo", kallpa: 0, exp: 0, nivel: 1, palabras: [], codigo: "", logros: [], nudos: [], runas: {}, racha: 0, ultimoDia: "", rescates: [], inventario: {} };
+  return { heroe: "", nombre: "", paso: "prologo", kallpa: 0, exp: 0, nivel: 1, palabras: [], codigo: "", logros: [], nudos: [], runas: {}, racha: 0, ultimoDia: "", rescates: [], inventario: {}, zonas: {}, sellos: {}, leccionPaso: {}, zonaActual: "" };
 }
 
 function cargar(): Estado {

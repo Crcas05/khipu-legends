@@ -1,0 +1,7 @@
+Ilustraciones del juego (opcionales). Si subes un archivo con estos nombres, el juego lo usa solo:
+
+  portada.jpg     Fondo de la portada (horizontal, 1600 x 900 aprox.)
+  mapa-peru.jpg   Mapa ilustrado del Perú para "El viaje del Chaski" (vertical 3:4, 1200 x 1600 aprox.)
+
+Las posiciones de las zonas en el mapa están en src/datos/zonas.ts (campo "mapa", en %).
+Revisa que la licencia de tu herramienta de imágenes permita publicarlas.

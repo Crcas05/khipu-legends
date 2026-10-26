@@ -6,7 +6,7 @@
 import type { Reto } from "../ui/taller";
 import type { RetoBloques } from "../ui/bloques";
 
-export type Quien = "chaski" | "mama" | "tuki" | "amaru" | "narrador";
+export type Quien = "chaski" | "mama" | "tuki" | "amaru" | "killa" | "yaru" | "narrador";
 export interface Linea {
   quien: Quien;
   texto: string;
@@ -17,6 +17,8 @@ export const NOMBRES: Record<Quien, string> = {
   mama: "Mama Khipu",
   tuki: "Tuki",
   amaru: "Amaru",
+  killa: "Killa",
+  yaru: "Yaru",
   narrador: "",
 };
 
@@ -34,6 +36,11 @@ export const PALABRAS: Record<string, string> = {
   yanapay: "ayudar",
   mayu: "río",
   kuntur: "cóndor",
+  kamisaraki: "¿cómo estás? (saludo aymara)",
+  killa: "luna",
+  qucha: "lago, laguna",
+  jallalla: "¡que viva! (aymara)",
+  ayni: "ayuda mutua",
 };
 
 export const OBJETIVOS: Record<string, string> = {
