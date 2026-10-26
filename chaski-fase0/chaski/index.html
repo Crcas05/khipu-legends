@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#1d1a39">
+  <title>Chaski Runes · Prueba 3D</title>
+</head>
+<body>
+  <canvas id="lienzo" touch-action="none"></canvas>
+  <div id="etiquetas" aria-hidden="true"></div>
+
+  <!-- Portada de la prueba -->
+  <section id="portada">
+    <div class="logo">
+      <span class="logo-1">CHASKI</span>
+      <span class="logo-2">RUNES</span>
+      <span class="logo-sub">Guardianes del Código</span>
+    </div>
+    <p class="nota">Fase 0 · Prueba técnica 3D</p>
+    <p class="explica">Camina por la plaza y fíjate si el juego se mueve fluido en tu celular. Arriba a la izquierda verás cuántos cuadros por segundo (FPS) logra.</p>
+    <button id="boton-jugar" class="boton-oro">▶ JUGAR</button>
+  </section>
+
+  <!-- Interfaz -->
+  <div class="panel insignia">CHASKI RUNES <small>· Fase 0</small></div>
+  <div class="panel medidor">
+    <span id="fps" data-nivel="bien">— FPS</span>
+    <span class="calidades">
+      <button data-calidad="bajo">Bajo</button>
+      <button data-calidad="medio">Medio</button>
+      <button data-calidad="alto">Alto</button>
+    </span>
+  </div>
+  <button class="panel boton-pantalla" id="boton-pantalla" aria-label="Pantalla completa">⛶</button>
+  <div class="aviso" id="aviso" hidden></div>
+
+  <div id="zona-joystick"></div>
+  <div id="joystick"><div id="perilla"></div></div>
+  <button id="boton-accion" aria-label="Abrir el Ojo">👁<br>OJO</button>
+
+  <div id="girar"><div class="girar-icono">📱↻</div><p>Gira tu celular para jugar en horizontal</p></div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

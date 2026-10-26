@@ -1,0 +1,73 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+html, body {
+  width: 100%; height: 100%; overflow: hidden; background: #1d1a39; color: #fff;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: none;
+}
+#lienzo { position: fixed; inset: 0; width: 100%; height: 100%; outline: none; }
+
+.panel {
+  position: fixed; z-index: 5; background: rgba(18, 22, 48, .82); border: 2px solid #f5b83d;
+  border-radius: 10px; box-shadow: 0 3px 0 rgba(0, 0, 0, .4); color: #fff;
+}
+.insignia { top: max(8px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); padding: 5px 14px; font-weight: 900; letter-spacing: .08em; color: #f5b83d; font-size: 13px; }
+.insignia small { color: #c9d2ff; font-weight: 600; letter-spacing: 0; }
+.medidor { top: max(8px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); padding: 6px 8px; display: flex; gap: 8px; align-items: center; font-size: 12px; font-weight: 800; }
+#fps[data-nivel="bien"] { color: #7dffb0; }
+#fps[data-nivel="medio"] { color: #ffd166; }
+#fps[data-nivel="mal"] { color: #ff7b7b; }
+.calidades { display: flex; gap: 3px; }
+.calidades button { border: 0; border-radius: 6px; padding: 4px 7px; font-size: 11px; font-weight: 800; background: #2c3570; color: #c9d2ff; cursor: pointer; }
+.calidades button.activo { background: #f5b83d; color: #1d1a39; }
+.boton-pantalla { top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); width: 40px; height: 40px; font-size: 18px; cursor: pointer; }
+
+.aviso {
+  position: fixed; top: 58px; left: 50%; transform: translateX(-50%); z-index: 6; max-width: 80vw;
+  background: #f5b83d; color: #1d1a39; font-weight: 800; font-size: 13px; text-align: center;
+  padding: 7px 16px; border-radius: 999px; box-shadow: 0 3px 0 rgba(0, 0, 0, .35);
+}
+
+/* Joystick y botón */
+#zona-joystick { position: fixed; left: 0; bottom: 0; width: 45vw; height: 72vh; z-index: 4; }
+#joystick { position: fixed; width: 96px; height: 96px; border-radius: 50%; left: max(28px, env(safe-area-inset-left)); bottom: 24px; background: rgba(255,255,255,.16); border: 2px solid rgba(255,255,255,.5); pointer-events: none; z-index: 5; }
+#joystick.activo { bottom: auto; }
+#perilla { position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px; border-radius: 50%; background: rgba(255,255,255,.6); border: 2px solid #fff; }
+#boton-accion {
+  position: fixed; right: max(26px, env(safe-area-inset-right)); bottom: 26px; width: 78px; height: 78px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #4ff0dc, #1a8f86); color: #fff; font-weight: 900; font-size: 13px; line-height: 1.1;
+  border: 3px solid #fff; box-shadow: 0 4px 0 rgba(0,0,0,.4), 0 0 18px rgba(79, 240, 220, .6); z-index: 5; cursor: pointer;
+}
+#boton-accion.presionado { transform: translateY(3px); }
+@media (hover: hover) and (pointer: fine) { #zona-joystick, #joystick { display: none; } }
+
+/* Modo Ojo */
+#etiquetas { position: fixed; inset: 0; pointer-events: none; z-index: 3; }
+.etiqueta-codigo {
+  position: absolute; left: 0; top: 0; white-space: nowrap;
+  font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; font-weight: 700;
+  color: #7dfff0; background: rgba(4, 12, 28, .85); border: 1px solid #4ff0dc; border-radius: 6px; padding: 3px 7px;
+  box-shadow: 0 0 12px rgba(79, 240, 220, .45);
+}
+body.ojo .insignia { border-color: #4ff0dc; color: #4ff0dc; }
+
+/* Portada */
+#portada {
+  position: fixed; inset: 0; z-index: 10; display: grid; place-content: center; justify-items: center; gap: 10px; text-align: center; padding: 20px;
+  background: radial-gradient(ellipse at 50% 30%, rgba(48, 60, 140, .55), rgba(18, 16, 44, .92));
+}
+.logo { display: grid; line-height: .9; }
+.logo-1, .logo-2 { font-size: clamp(44px, 9vw, 80px); font-weight: 900; color: #f5b83d; text-shadow: 0 4px 0 #b8432f, 0 8px 0 #4a1a12, 0 10px 24px rgba(0,0,0,.5); letter-spacing: .02em; }
+.logo-2 { color: #ffd166; }
+.logo-sub { margin-top: 10px; font-size: 15px; font-weight: 800; letter-spacing: .25em; text-transform: uppercase; color: #fff; }
+.nota { color: #4ff0dc; font-weight: 800; font-size: 13px; letter-spacing: .08em; }
+.explica { max-width: 460px; color: #d8dcff; font-size: 14px; }
+.boton-oro {
+  margin-top: 6px; border: 0; border-radius: 14px; padding: 14px 40px; font-size: 20px; font-weight: 900; cursor: pointer;
+  background: linear-gradient(#ffd166, #f5a623); color: #3a1d06; box-shadow: 0 6px 0 #a5650e, 0 10px 20px rgba(0,0,0,.4);
+}
+.boton-oro:active { transform: translateY(4px); box-shadow: 0 2px 0 #a5650e; }
+
+#girar { display: none; position: fixed; inset: 0; z-index: 20; background: #1d1a39; place-content: center; text-align: center; gap: 12px; padding: 24px; }
+.girar-icono { font-size: 54px; }
+@media (orientation: portrait) and (pointer: coarse) { #girar { display: grid; } }
