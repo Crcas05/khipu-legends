@@ -12,7 +12,9 @@ export const OBJETIVOS_2: Record<string, string> = {
   forja: "Forja tu runa de ataque en el 📜 Taller",
   batalla: "¡Derrota al Bug Ch'aqwa con tus runas!",
   victoria: "Habla con Amaru",
-  completo2: "Episodio 2 completado ✓",
+  completo2: "Habla con Amaru para seguir al Bug",
+  valle: "Rescata el valle: sigue la flecha o mira el mapa 🗺",
+  completo3: "¡Valle Sagrado restaurado! ✓",
 };
 
 export const LLEGADA: Linea[] = [

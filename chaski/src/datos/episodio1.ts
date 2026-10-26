@@ -32,6 +32,8 @@ export const PALABRAS: Record<string, string> = {
   punku: "puerta",
   atipay: "vencer",
   yanapay: "ayudar",
+  mayu: "río",
+  kuntur: "cóndor",
 };
 
 export const OBJETIVOS: Record<string, string> = {

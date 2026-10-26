@@ -141,7 +141,7 @@ export function nuevoNivel(aprendido: string[]): Promise<void> {
   );
 }
 
-export function proximamente(episodio = 2): Promise<"selva" | "plaza" | "repetir"> {
+export function proximamente(episodio = 2): Promise<"selva" | "plaza" | "repetir" | "valle"> {
   const caja = document.getElementById("nivel")!;
   caja.innerHTML =
     episodio === 2
@@ -157,22 +157,35 @@ export function proximamente(episodio = 2): Promise<"selva" | "plaza" | "repetir
       </div>
       <button class="boton-secundario" id="repetir">↺ Repetir episodio 1</button>
     </div>`
+      : episodio === 3
+      ? `
+    <div class="nivel-marco">
+      <p class="nota">TEMPORADA 1 · MISIÓN 2 · ZONA 1</p>
+      <h2 class="nivel-titulo pequeño">El Valle Sagrado</h2>
+      <p class="nivel-numero">¡Mundo abierto!</p>
+      <p class="explica">Explora libremente, espanta mini-Bugs con tu <b>huaraca</b> y <b>rescata la naturaleza</b> con código: la vicuña, el río, las queñuas, el cóndor y el colibrí. Aprenderás <b>if / else</b> y <b>listas</b>.</p>
+      <div class="fila-botones">
+        <button class="boton-oro" id="ir-valle">🏔 ¡Ir al Valle Sagrado!</button>
+        <button class="boton-secundario" id="ir-plaza">Quedarme aquí</button>
+      </div>
+    </div>`
       : `
     <div class="nivel-marco">
-      <p class="nota">TEMPORADA 1 · MISIÓN 2</p>
-      <h2 class="nivel-titulo pequeño">Episodio 3</h2>
+      <p class="nota">TEMPORADA 1 · MISIÓN 3</p>
+      <h2 class="nivel-titulo pequeño">Zona 2</h2>
       <p class="nivel-numero">Muy pronto</p>
       <p class="explica">El Bug tiene hermanos. Prepárate para <b>if / else</b>, el <b>Khipu vivo</b> (listas) y <b>Killa</b>, la guerrera de la luna.</p>
       <button class="boton-oro" id="ir-plaza">🌿 Seguir explorando</button>
     </div>`;
   caja.hidden = false;
   return new Promise((r) => {
-    const fin = (v: "selva" | "plaza" | "repetir") => () => {
+    const fin = (v: "selva" | "plaza" | "repetir" | "valle") => () => {
       sonido.toque();
       caja.hidden = true;
       r(v);
     };
     caja.querySelector("#ir-selva")?.addEventListener("click", fin("selva"));
+    caja.querySelector("#ir-valle")?.addEventListener("click", fin("valle"));
     caja.querySelector("#ir-plaza")?.addEventListener("click", fin("plaza"));
     caja.querySelector("#repetir")?.addEventListener("click", fin("repetir"));
   });

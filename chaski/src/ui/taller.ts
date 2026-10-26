@@ -22,6 +22,8 @@ export interface Reto {
   /** Recibe las partes de la línea §REVISION§ y lo que mostró el jugador. Devuelve un consejo o null si está bien. */
   validar: (partes: string[], visibles: string[]) => string | null;
   exito: string;
+  /** Una sola línea de Python oculta que prepara el mundo. */
+  preludio?: string;
 }
 
 export function abrirTaller(r: Reto): Promise<boolean> {
@@ -120,7 +122,8 @@ export function abrirTaller(r: Reto): Promise<boolean> {
       if (completado) return cerrar(true);
       botonEjecutar.disabled = true;
       consola.innerHTML = '<span class="gris">Ejecutando…</span>';
-      const res = await python.ejecutar(editor.value + r.revision);
+      const res = await python.ejecutar((r.preludio ? r.preludio + "\n" : "") + editor.value + r.revision);
+      if (r.preludio && res.error?.linea) res.error.linea -= 1;
       botonEjecutar.disabled = false;
       const lineas = res.salida.join("\n").split("\n");
       const revision = lineas.find((l) => l.startsWith("§REVISION§"));

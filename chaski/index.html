@@ -40,6 +40,15 @@
     </div>
   </div>
 
+  <div id="hud-valle" hidden>
+    <canvas id="mapa" width="160" height="160"></canvas>
+    <div class="valle-datos">
+      <span>🌿 Naturaleza <b id="valle-progreso">0/6</b></span>
+      <code id="valle-inventario">inventario = {}</code>
+      <div class="barra mini"><i id="vida-valle"></i></div>
+    </div>
+  </div>
+
   <div class="panel ajustes" id="ajustes" hidden>
     <h3>Ajustes</h3>
     <p>Gráficos: <span id="fps" data-nivel="bien">— FPS</span></p>
@@ -69,7 +78,9 @@
   <div id="zona-joystick"></div>
   <div id="joystick"><div id="perilla"></div></div>
   <div class="botones-accion" id="botones-accion" hidden>
+    <button id="boton-rescatar" class="boton-redondo rescatar" hidden>🔧<br>RESCATAR</button>
     <button id="boton-hablar" class="boton-redondo hablar" hidden>💬<br>HABLAR</button>
+    <button id="boton-huaraca" class="boton-redondo huaraca" hidden>🎯<br>HUARACA</button>
     <button id="boton-taller" class="boton-redondo taller" hidden>📜<br>TALLER</button>
     <button id="boton-accion" class="boton-redondo ojo" aria-label="Abrir el Ojo">👁<br>OJO</button>
   </div>

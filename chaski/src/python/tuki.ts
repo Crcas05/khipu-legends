@@ -15,6 +15,18 @@ export function traducirError(error: ErrorPython): { bug: string; texto: string 
   }
 
   if (tipo === "SyntaxError") {
+    if (/Maybe you meant '=='/i.test(mensaje)) {
+      return {
+        bug: "SyntaxBug",
+        texto: `Para COMPARAR se usan dos signos: ==${enLinea}. Un solo = sirve para GUARDAR un valor.`,
+      };
+    }
+    if (/expected ':'/i.test(mensaje)) {
+      return { bug: "SyntaxBug", texto: `Falta el dos puntos (:) al final de la línea${enLinea}. Las líneas con if, for y def terminan en :` };
+    }
+    if (/expected an indented block/i.test(mensaje)) {
+      return { bug: "IndentBug", texto: `La línea de adentro necesita 4 espacios de sangría${enLinea}.` };
+    }
     if (/unterminated string/i.test(mensaje)) {
       return {
         bug: "SyntaxBug",
@@ -46,9 +58,12 @@ export function traducirError(error: ErrorPython): { bug: string; texto: string 
   }
 
   if (tipo === "IndentationError") {
+    if (/expected an indented block/i.test(mensaje)) {
+      return { bug: "IndentBug", texto: `La línea de adentro (después de if, for o def) necesita 4 espacios al inicio${enLinea}.` };
+    }
     return {
       bug: "IndentBug",
-      texto: `Hay espacios de más al inicio${enLinea}. Por ahora, cada línea empieza pegada a la izquierda.`,
+      texto: `Hay espacios de más al inicio${enLinea}. Solo las líneas que van DENTRO de un if, for o def llevan 4 espacios.`,
     };
   }
 
@@ -58,7 +73,7 @@ export function traducirError(error: ErrorPython): { bug: string; texto: string 
     if (nombre && nombre.toLowerCase() === "print") {
       return {
         bug: "NameBug",
-        texto: `Para Python, ${nombre} y print son distintos${enLinea}. el idioma de las runas se escribe en minúsculas: print.`,
+        texto: `Para Python, ${nombre} y print son distintos${enLinea}. El idioma de las runas se escribe en minúsculas: print.`,
       };
     }
     if (sugerencia) {

@@ -35,9 +35,9 @@ export function pieza(m: Mesh, padre: TransformNode, mat: StandardMaterial, x = 
 // ---------------------------------------------------------------------------
 // Yaru, la llama
 // ---------------------------------------------------------------------------
-export function crearLlama(escena: Scene, x: number, z: number) {
-  // (Yaru será héroe jugable en la Misión 4)
-  const lana = material(escena, "#f3ebdc");
+export function crearLlama(escena: Scene, x: number, z: number, lanaHex = "#f3ebdc", conManta = true) {
+  // (Yaru será héroe jugable en la Misión 4). Con otro color y sin manta sirve de vicuña.
+  const lana = material(escena, lanaHex);
   const manta = material(escena, "#c8102e");
   const franja = material(escena, "#1fa596");
   const oro = material(escena, "#f5b83d");
@@ -50,8 +50,10 @@ export function crearLlama(escena: Scene, x: number, z: number) {
     return mesh;
   };
   m(MeshBuilder.CreateCapsule("lomo", { radius: 0.42, height: 1.5, tessellation: 10 }, escena), lana, 0, 1.15, 0).rotation.x = Math.PI / 2;
-  m(MeshBuilder.CreateBox("manta", { width: 0.9, height: 0.12, depth: 0.8 }, escena), manta, 0, 1.55, -0.05);
-  m(MeshBuilder.CreateBox("manta-franja", { width: 0.92, height: 0.13, depth: 0.16 }, escena), franja, 0, 1.56, -0.05);
+  if (conManta) {
+    m(MeshBuilder.CreateBox("manta", { width: 0.9, height: 0.12, depth: 0.8 }, escena), manta, 0, 1.55, -0.05);
+    m(MeshBuilder.CreateBox("manta-franja", { width: 0.92, height: 0.13, depth: 0.16 }, escena), franja, 0, 1.56, -0.05);
+  }
   m(MeshBuilder.CreateCapsule("cuello", { radius: 0.2, height: 1.0, tessellation: 8 }, escena), lana, 0, 1.75, 0.55);
   m(MeshBuilder.CreateSphere("cabeza", { diameter: 0.5, segments: 10 }, escena), lana, 0, 2.3, 0.7);
   m(MeshBuilder.CreateBox("hocico", { width: 0.26, height: 0.22, depth: 0.3 }, escena), lana, 0, 2.2, 0.95);

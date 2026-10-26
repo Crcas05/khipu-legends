@@ -18,6 +18,8 @@ export interface RetoBloques {
   /** Lo que debe mostrar el programa al ejecutarse. */
   salidaEsperada: string[];
   teoria: string;
+  /** Una sola línea de Python oculta que prepara el mundo (funciones como quitar o plantar). */
+  preludio?: string;
 }
 
 const escapar = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;");
@@ -108,7 +110,8 @@ export function abrirBloques(r: RetoBloques): Promise<void> {
       ejecutar.disabled = true;
       const codigo = colocados.map((i) => bandeja[i]).join("\n");
       consola.innerHTML = '<span class="gris">Ejecutando…</span>';
-      const res = await python.ejecutar(codigo);
+      const res = await python.ejecutar(r.preludio ? `${r.preludio}\n${codigo}` : codigo);
+      if (r.preludio && res.error?.linea) res.error.linea -= 1;
       ejecutar.disabled = false;
       const salida = res.salida.join("\n").split("\n").filter((l) => l !== "");
       consola.innerHTML = salida.length ? salida.map((l) => `<div>${escapar(l)}</div>`).join("") : '<span class="gris">(no mostró nada)</span>';

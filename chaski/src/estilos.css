@@ -396,3 +396,20 @@ body.en-batalla .chips { display: none; }
 .runa-libro { background: #070b1e; border: 1px solid #2b3a8c; border-radius: 10px; padding: 8px 10px; }
 .runa-libro b { color: var(--oro2); font-size: 14px; }
 .runa-libro pre { font-size: 13px; color: #7dfff0; margin-top: 4px; white-space: pre-wrap; }
+
+/* ---------- Valle Sagrado: mapa, inventario, huaraca ---------- */
+#hud-valle { position: fixed; z-index: 5; top: 58px; left: max(8px, env(safe-area-inset-left)); display: grid; gap: 6px; pointer-events: none; }
+#mapa { width: 120px; height: 120px; border-radius: 50%; box-shadow: 0 3px 0 rgba(0,0,0,.4); border: 2px solid var(--oro); }
+.valle-datos { background: var(--panel); border: 2px solid #4a8a3a; border-radius: 10px; padding: 6px 8px; display: grid; gap: 4px; font-size: 12px; font-weight: 800; max-width: 46vw; }
+.valle-datos code { color: var(--oro2); font-size: 11px; white-space: normal; word-break: break-word; }
+.barra.mini { width: 100%; height: 8px; border-width: 1px; }
+#vida-valle { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #1f8f5e, #7dffb0); transition: width .2s; }
+body.vertical #hud-valle { top: 106px; }
+body.vertical #mapa { width: 96px; height: 96px; }
+.boton-redondo.huaraca { background: radial-gradient(circle at 35% 30%, #ff9e5e, #c2410c); width: 84px; height: 84px; font-size: 13px; }
+.boton-redondo.rescatar { background: radial-gradient(circle at 35% 30%, #7dffb0, #1f8f5e); color: #062a17; width: 76px; height: 76px; animation: late 1s infinite; }
+.ficha { background: linear-gradient(135deg, #1f3a2a, #1d1a39); border-left: 5px solid #7dffb0; border-radius: 10px; padding: 10px 12px; display: grid; gap: 4px; }
+.ficha b { color: #7dffb0; }
+.ficha small { color: #9aa6e8; }
+.ficha p { font-size: 14px; line-height: 1.45; }
+body.en-valle .botones-accion { flex-direction: column; }

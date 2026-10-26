@@ -4,6 +4,7 @@
 import { estado, guardar } from "../estado";
 import { PALABRAS } from "../datos/episodio1";
 import { sonido } from "../sonido";
+import { FICHAS } from "../datos/valle";
 
 export const LOGROS: Record<string, { icono: string; nombre: string; texto: string }> = {
   prologo: { icono: "🌅", nombre: "Primeras runas", texto: "Aprendiste 4 conceptos en un minuto" },
@@ -18,6 +19,7 @@ export const LOGROS: Record<string, { icono: string; nombre: string; texto: stri
   forja: { icono: "⚡", nombre: "Forjador de runas", texto: "Escribiste tu primera función con def" },
   jefe: { icono: "🐛", nombre: "Cazador de Bugs", texto: "Venciste al Bug Ch'aqwa" },
   racha3: { icono: "🔥", nombre: "Constancia andina", texto: "Jugaste 3 días seguidos" },
+  valle: { icono: "🏔", nombre: "Guardián del Valle", texto: "Restauraste el Valle Sagrado" },
   episodio2: { icono: "🌿", nombre: "Guardián de la selva", texto: "Completaste el Episodio 2" },
 };
 export const TOTAL_NUDOS = 3;
@@ -72,6 +74,16 @@ export function abrirSimiQillqa(): Promise<void> {
       </div>
       <h3>Nudos dorados · ${estado.nudos.length}/${TOTAL_NUDOS}</h3>
       <p class="simi-pista">${estado.nudos.length < TOTAL_NUDOS ? "Pista: solo se ven con el 👁 Ojo abierto. Busca detrás de las casas y cerca de los andenes." : "¡Los encontraste todos!"}</p>
+      <h3>🦙 Santuario · ${estado.rescates.length}/${Object.keys(FICHAS).length}</h3>
+      <div class="simi-palabras">
+        ${Object.entries(FICHAS)
+          .map(([k, f]) =>
+            estado.rescates.includes(k)
+              ? `<div class="palabra"><b>${f.icono} ${f.nombre}</b><span>${f.quechua} · ${f.dato}</span></div>`
+              : `<div class="palabra oculta"><b>${f.icono} ? ? ?</b><span>Rescátalo en el Valle Sagrado</span></div>`
+          )
+          .join("")}
+      </div>
       <h3>📜 Libro de runas · ${Object.keys(estado.runas).length}</h3>
       ${
         Object.keys(estado.runas).length
