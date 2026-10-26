@@ -26,22 +26,34 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: juego/package-lock.json
+          cache-dependency-path: |
+            juego/package-lock.json
+            chaski/package-lock.json
 
-      - name: Instalar dependencias del juego
+      - name: Instalar dependencias del juego 2D
         working-directory: juego
         run: npm ci
 
-      - name: Compilar el juego
+      - name: Compilar el juego 2D
         working-directory: juego
+        run: npm run build
+
+      - name: Instalar dependencias de Chaski Runes (3D)
+        working-directory: chaski
+        run: npm ci
+
+      - name: Compilar Chaski Runes (3D)
+        working-directory: chaski
         run: npm run build
 
       - name: Armar el sitio
         run: |
           mkdir -p _site
-          rsync -a --exclude juego --exclude .github --exclude .git --exclude _site ./ _site/
+          rsync -a --exclude juego --exclude chaski --exclude .github --exclude .git --exclude _site ./ _site/
           mkdir -p _site/selva
           cp -r juego/dist/. _site/selva/
+          mkdir -p _site/chaski
+          cp -r chaski/dist/. _site/chaski/
 
       - name: Subir el sitio
         uses: actions/upload-pages-artifact@v3
