@@ -1,9 +1,12 @@
 // Progreso del jugador. Se guarda solo en este dispositivo (sin cuentas ni datos personales).
 
-export type Paso = "intro" | "hablar1" | "fuente" | "techo" | "hablar2" | "taller" | "final" | "completo";
+export type Paso =
+  | "prologo" | "intro" | "hablar1" | "fuente" | "techo" | "hablar2" | "taller" | "final" | "completo"
+  | "selva" | "ecos" | "forja" | "batalla" | "victoria" | "completo2";
 
 export interface Estado {
   heroe: string;
+  nombre: string;
   paso: Paso;
   kallpa: number;
   exp: number;
@@ -12,12 +15,15 @@ export interface Estado {
   codigo: string;
   logros: string[];
   nudos: number[];
+  runas: Record<string, string>;
+  racha: number;
+  ultimoDia: string;
 }
 
 const CLAVE = "chaski-runes-v1";
 
 function inicial(): Estado {
-  return { heroe: "", paso: "intro", kallpa: 0, exp: 0, nivel: 1, palabras: [], codigo: "", logros: [], nudos: [] };
+  return { heroe: "", nombre: "", paso: "prologo", kallpa: 0, exp: 0, nivel: 1, palabras: [], codigo: "", logros: [], nudos: [], runas: {}, racha: 0, ultimoDia: "" };
 }
 
 function cargar(): Estado {
@@ -50,5 +56,6 @@ export function reiniciar() {
 }
 
 /** Orden de los pasos, para saber si uno ya pasó. */
-const ORDEN: Paso[] = ["intro", "hablar1", "fuente", "techo", "hablar2", "taller", "final", "completo"];
+const ORDEN: Paso[] = ["prologo", "intro", "hablar1", "fuente", "techo", "hablar2", "taller", "final", "completo", "selva", "ecos", "forja", "batalla", "victoria", "completo2"];
+export const enSelva = () => ORDEN.indexOf(estado.paso) >= ORDEN.indexOf("selva");
 export const yaPaso = (p: Paso) => ORDEN.indexOf(estado.paso) > ORDEN.indexOf(p);

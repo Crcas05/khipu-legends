@@ -226,11 +226,22 @@ export function crearMundo(escena: Scene) {
     glitches.push(g);
   }
   let t = 0;
+  // Centro y radio de la órbita del Bug (cambian cuando ataca al jugador)
+  const centroBug = new Vector3(0, 0, 0);
+  let radioBug = 3;
+  let objetivoBug: Vector3 | null = null;
+  let radioObjetivo = 3;
   escena.onBeforeRenderObservable.add(() => {
-    t += escena.getEngine().getDeltaTime() / 1000;
+    const dt = escena.getEngine().getDeltaTime() / 1000;
+    t += dt;
+    const meta = objetivoBug ?? Vector3.Zero();
+    centroBug.x += (meta.x - centroBug.x) * Math.min(1, dt * 3);
+    centroBug.z += (meta.z - centroBug.z) * Math.min(1, dt * 3);
+    radioBug += (radioObjetivo - radioBug) * Math.min(1, dt * 2);
     glitches.forEach((g, i) => {
-      const a = t * (0.6 + i * 0.07) + i;
-      g.position.set(Math.sin(a) * (3 + (i % 3) * 0.6), 1.2 + Math.sin(t * 2 + i) * 0.6 + (i % 2), Math.cos(a) * (3 + (i % 3) * 0.6));
+      const a = t * (0.6 + i * 0.07) * (objetivoBug ? 2.2 : 1) + i;
+      const r = radioBug + (i % 3) * 0.6 * (radioBug / 3);
+      g.position.set(centroBug.x + Math.sin(a) * r, 1.2 + Math.sin(t * 2 + i) * 0.6 + (i % 2), centroBug.z + Math.cos(a) * r);
       g.rotation.set(t * 1.3 + i, t * 0.9, t * 0.5 * i);
       // Parpadeo "glitch"
       g.isVisible = g.metadata !== "oculto" && Math.sin(t * 9 + i * 3) > -0.85;
@@ -257,6 +268,11 @@ export function crearMundo(escena: Scene) {
       const mat = coloresTecho[color] ?? gris;
       for (const tec of techos) tec.material = mat;
     },
+    /** El Bug rodea al jugador (ataque) o vuelve a la fuente (null). radio: qué tan cerca. */
+    atacar(objetivo: Vector3 | null, radio = 3) {
+      objetivoBug = objetivo;
+      radioObjetivo = radio;
+    },
     /** Muestra u oculta los glitches del Bug */
     bug(visible: boolean) {
       for (const g of glitches) g.metadata = visible ? null : "oculto";
@@ -267,7 +283,7 @@ export function crearMundo(escena: Scene) {
 }
 
 /** Empuja la posición fuera de los objetos sólidos y dentro del límite del mapa. */
-export function resolverChoques(pos: Vector3, choques: Choque[], radio = 0.45) {
+export function resolverChoques(pos: Vector3, choques: Choque[], radio = 0.45, limite = LIMITE) {
   for (const c of choques) {
     const dx = pos.x - c.x;
     const dz = pos.z - c.z;
@@ -279,8 +295,8 @@ export function resolverChoques(pos: Vector3, choques: Choque[], radio = 0.45) {
     }
   }
   const d = Math.hypot(pos.x, pos.z);
-  if (d > LIMITE) {
-    pos.x *= LIMITE / d;
-    pos.z *= LIMITE / d;
+  if (d > limite) {
+    pos.x *= limite / d;
+    pos.z *= limite / d;
   }
 }

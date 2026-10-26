@@ -141,22 +141,39 @@ export function nuevoNivel(aprendido: string[]): Promise<void> {
   );
 }
 
-export function proximamente(): Promise<"plaza" | "repetir"> {
+export function proximamente(episodio = 2): Promise<"selva" | "plaza" | "repetir"> {
   const caja = document.getElementById("nivel")!;
-  caja.innerHTML = `
+  caja.innerHTML =
+    episodio === 2
+      ? `
     <div class="nivel-marco">
       <p class="nota">TEMPORADA 1 · MISIÓN 1</p>
       <h2 class="nivel-titulo pequeño">Episodio 2</h2>
       <p class="nivel-numero">La selva de Ch'aqwa</p>
-      <p class="explica">Tu primera batalla contra el Bug: escribirás runas en el Taller y las lanzarás con tus cartas Q, W, E y R. <b>Muy pronto.</b></p>
+      <p class="explica">Conocerás a <b>Amaru</b>, crearás <b>ecos</b> de ti mismo con <code>for</code> y forjarás tu primera <b>runa de ataque</b> con <code>def</code> para tu primera batalla.</p>
       <div class="fila-botones">
-        <button class="boton-oro" id="ir-plaza">🏘 Pasear por la plaza</button>
-        <button class="boton-secundario" id="repetir">↺ Repetir episodio</button>
+        <button class="boton-oro" id="ir-selva">🌿 ¡Viajar a la selva!</button>
+        <button class="boton-secundario" id="ir-plaza">🏘 Quedarme en la plaza</button>
       </div>
+      <button class="boton-secundario" id="repetir">↺ Repetir episodio 1</button>
+    </div>`
+      : `
+    <div class="nivel-marco">
+      <p class="nota">TEMPORADA 1 · MISIÓN 2</p>
+      <h2 class="nivel-titulo pequeño">Episodio 3</h2>
+      <p class="nivel-numero">Muy pronto</p>
+      <p class="explica">El Bug tiene hermanos. Prepárate para <b>if / else</b>, el <b>Khipu vivo</b> (listas) y <b>Killa</b>, la guerrera de la luna.</p>
+      <button class="boton-oro" id="ir-plaza">🌿 Seguir explorando</button>
     </div>`;
   caja.hidden = false;
   return new Promise((r) => {
-    caja.querySelector("#ir-plaza")!.addEventListener("click", () => ((caja.hidden = true), r("plaza")));
-    caja.querySelector("#repetir")!.addEventListener("click", () => ((caja.hidden = true), r("repetir")));
+    const fin = (v: "selva" | "plaza" | "repetir") => () => {
+      sonido.toque();
+      caja.hidden = true;
+      r(v);
+    };
+    caja.querySelector("#ir-selva")?.addEventListener("click", fin("selva"));
+    caja.querySelector("#ir-plaza")?.addEventListener("click", fin("plaza"));
+    caja.querySelector("#repetir")?.addEventListener("click", fin("repetir"));
   });
 }

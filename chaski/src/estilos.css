@@ -287,3 +287,112 @@ button.chip { cursor: pointer; }
 .confeti { position: absolute; inset: -60px -20px auto; height: 100vh; pointer-events: none; overflow: hidden; z-index: -1; }
 .confeti i { position: absolute; top: -20px; width: 8px; height: 14px; border-radius: 2px; animation: cae 2.4s linear infinite; }
 @keyframes cae { to { transform: translateY(110vh) rotate(720deg); } }
+
+/* ---------- Prólogo: los primeros 60 segundos ---------- */
+.portada-codigo {
+  font-size: clamp(12px, 2.6vw, 15px); color: #7dfff0; background: rgba(4, 12, 28, .7); border: 1px solid rgba(79,240,220,.5);
+  border-radius: 10px; padding: 8px 14px; text-align: left; min-height: 5.4em; min-width: min(300px, 80vw); white-space: pre;
+}
+.portada-codigo.listo { border-color: var(--oro); box-shadow: 0 0 18px rgba(245,184,61,.35); }
+@media (max-height: 460px) { .portada-codigo { display: none; } }
+
+#prologo { position: fixed; z-index: 27; left: 50%; bottom: 12px; transform: translateX(-50%); width: min(620px, calc(100vw - 16px)); }
+#prologo.entra .prologo-tarjeta { animation: aparece .35s ease-out; }
+.prologo-tarjeta {
+  background: rgba(14, 18, 42, .96); border: 3px solid var(--turquesa); border-radius: 18px; padding: 14px; display: grid; gap: 10px;
+  box-shadow: 0 6px 0 rgba(0,0,0,.45), 0 0 26px rgba(79,240,220,.3); max-height: calc(100dvh - 24px); overflow: auto;
+}
+.prologo-tuki { display: flex; gap: 10px; align-items: center; font-size: 16px; line-height: 1.4; }
+.prologo-tuki .retrato { flex: none; }
+.linea-codigo {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap; background: #070b1e; border: 2px solid #2b3a8c; border-radius: 12px; padding: 10px 12px;
+  font-family: ui-monospace, Menlo, Consolas, monospace; font-size: clamp(17px, 4.6vw, 22px);
+}
+.linea-codigo input {
+  flex: 1; min-width: 120px; background: transparent; border: 0; border-bottom: 3px dashed var(--oro2); color: var(--oro2); font: inherit; outline: none;
+  -webkit-user-select: text; user-select: text; touch-action: auto;
+}
+.var { color: #7dfff0; } .str { color: var(--oro2); } .op { color: #c9d2ff; } .num { color: #ff9ecf; } .fn { color: #c78bff; } .valor { color: var(--oro2); }
+.codigo-mini { background: #070b1e; border: 1px solid #2b3a8c; border-radius: 10px; padding: 10px 14px; font-size: clamp(16px, 4.4vw, 20px); color: #e8ecff; }
+.prologo-opciones { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.prologo-nota { padding: 8px 12px; border-radius: 10px; font-size: 14px; font-weight: 700; }
+.prologo-nota.bien { background: rgba(31, 143, 94, .3); color: #b5ffd6; }
+.prologo-nota.mal { background: rgba(200, 16, 46, .25); color: #ffc2c2; }
+.teoria { background: linear-gradient(135deg, #1f2a6e, #2b1f5e); border-left: 5px solid var(--oro); border-radius: 10px; padding: 10px 12px; }
+.teoria b { color: var(--oro); font-size: 12px; letter-spacing: .1em; }
+.teoria p { font-size: 15px; line-height: 1.45; margin-top: 4px; }
+.teoria code, .prologo-resumen code, .explica code { background: #070b1e; color: var(--oro2); padding: 1px 5px; border-radius: 5px; }
+.prologo-titulo { color: var(--oro2); font-size: 20px; text-align: center; }
+.prologo-resumen { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.prologo-resumen span { background: #222a5e; border-radius: 10px; padding: 8px 10px; font-weight: 800; font-size: 14px; }
+body.en-prologo .botones-accion, body.en-prologo #joystick, body.en-prologo #objetivo { display: none !important; }
+
+#barra-kallpa { position: fixed; z-index: 26; top: 60px; left: 50%; transform: translateX(-50%); display: grid; gap: 4px; justify-items: center; }
+#barra-texto { font-size: 18px; font-weight: 800; color: var(--oro2); background: rgba(4, 12, 28, .85); padding: 4px 12px; border-radius: 8px; border: 1px solid var(--oro); }
+.barra { width: min(320px, 70vw); height: 18px; border-radius: 999px; background: #20234f; border: 2px solid #fff; overflow: hidden; }
+#barra-relleno { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ffd166, #f5a623, #ff6a13); transition: width .8s cubic-bezier(.2,1.4,.4,1); }
+
+body.alarma::after { content: ""; position: fixed; inset: 0; z-index: 2; pointer-events: none; box-shadow: inset 0 0 90px rgba(200, 16, 46, .8); animation: titila .6s infinite; }
+body.golpe::before { content: ""; position: fixed; inset: 0; z-index: 2; pointer-events: none; background: rgba(255, 40, 60, .35); animation: desvanece .4s forwards; }
+@keyframes desvanece { to { opacity: 0; } }
+
+/* ---------- Episodio 2: viaje, batalla y modo enfoque ---------- */
+#velo { position: fixed; inset: 0; z-index: 50; background: #0b1a10; opacity: 0; transition: opacity .45s; pointer-events: none; }
+#velo.cubre { opacity: 1; pointer-events: auto; }
+
+#batalla { position: fixed; inset: 0; z-index: 7; pointer-events: none; }
+#batalla > * { pointer-events: auto; }
+.barra-jefe { position: fixed; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); width: min(460px, 70vw); text-align: center; display: grid; gap: 4px; }
+.barra-jefe b { font-size: 15px; color: #e3d0ff; text-shadow: 0 2px 0 #000; }
+.barra-jefe code, .barra-jugador code { font-size: 13px; color: var(--oro2); }
+.barra.roja #jefe-vida { display: block; height: 100%; background: linear-gradient(90deg, #8b3dff, #ff3355); transition: width .3s; }
+.barra.verde #jugador-vida { display: block; height: 100%; background: linear-gradient(90deg, #1f8f5e, #7dffb0); transition: width .3s; }
+.barra-jefe .barra, .barra-jugador .barra { width: 100%; }
+.barra-jugador { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); width: min(300px, 40vw); text-align: center; display: grid; gap: 3px; }
+.cartas { position: fixed; right: max(14px, env(safe-area-inset-right)); bottom: 14px; display: grid; grid-template-columns: repeat(2, 72px); gap: 8px; }
+.carta {
+  position: relative; height: 82px; border-radius: 14px; border: 3px solid var(--oro); color: #fff; overflow: hidden;
+  background: linear-gradient(#3b2f7a, #1c1846); box-shadow: 0 4px 0 #0b0920; display: grid; place-items: center; padding: 4px 2px;
+}
+.carta kbd { position: absolute; top: 3px; left: 6px; font: 900 12px system-ui; color: var(--oro2); }
+.carta span { font-size: 28px; line-height: 1; }
+.carta small { font: 700 11px ui-monospace, Menlo, monospace; color: #c9d2ff; }
+.carta::after { content: ""; position: absolute; left: 0; bottom: 0; width: 100%; height: calc(100% - var(--carga, 100%)); background: rgba(0,0,0,.6); pointer-events: none; }
+.carta.enfriando { border-color: #4a529c; }
+.carta.bloqueada { filter: grayscale(.9); opacity: .6; }
+.carta:active { transform: translateY(3px); }
+body.en-batalla .botones-accion, body.en-batalla #objetivo { display: none !important; }
+body.vertical .cartas { grid-template-columns: repeat(4, 64px); }
+body.vertical .carta { height: 76px; }
+body.vertical .barra-jugador { bottom: 104px; width: 70vw; }
+
+.dano { position: fixed; top: 22%; left: 50%; transform: translateX(-50%); z-index: 9; font: 900 34px system-ui; color: #fff; text-shadow: 0 3px 0 #6a2bbf, 0 0 14px #b388ff; animation: dano 1.3s ease-out forwards; pointer-events: none; white-space: nowrap; }
+.dano.critico { color: var(--oro2); font-size: 42px; text-shadow: 0 3px 0 #a5650e, 0 0 18px #ffd166; }
+.dano.recibido { top: 60%; color: #ff6b7d; text-shadow: 0 3px 0 #5a0010; }
+.dano.codigo { top: 55%; font: 800 24px ui-monospace, Menlo, monospace; color: var(--turquesa); text-shadow: 0 2px 0 #000; }
+@keyframes dano { from { opacity: 0; transform: translate(-50%, 20px) scale(.6); } 20% { opacity: 1; transform: translate(-50%, 0) scale(1.15); } to { opacity: 0; transform: translate(-50%, -50px) scale(1); } }
+
+#enfoque { position: fixed; inset: 0; z-index: 29; display: grid; place-items: center; padding: 12px; background: rgba(20, 10, 50, .55); backdrop-filter: saturate(.3); }
+.enfoque-tarjeta { width: min(520px, 100%); background: #151a3c; border: 3px solid #c78bff; border-radius: 18px; padding: 16px; display: grid; gap: 10px; box-shadow: 0 0 30px rgba(199,139,255,.4); }
+.enfoque-titulo { color: #c78bff; font-weight: 900; letter-spacing: .12em; font-size: 13px; }
+.barra-jefe, .barra-jugador { background: rgba(14, 18, 42, .88); border: 2px solid #6a2bbf; border-radius: 12px; padding: 6px 12px; }
+.barra-jugador { border-color: #1f8f5e; }
+.barra-jefe code, .barra-jugador code { font-weight: 800; }
+body.en-batalla .chips { display: none; }
+.carta.corrupta { border-color: #ff3355; animation: titila .4s infinite; }
+.carta.corrupta span { filter: hue-rotate(220deg); }
+/* Bloques de código */
+#bloques { z-index: 30; }
+.bloques-tarjeta { width: min(720px, 100%); max-height: calc(100dvh - 24px); overflow: auto; border-color: var(--oro); }
+.bloques-cuerpo { padding: 14px; display: grid; gap: 10px; }
+.bloques-ayuda { font-size: 13px; color: #c9d2ff; }
+.bloques-runa { min-height: 70px; background: #070b1e; border: 2px dashed #4a529c; border-radius: 12px; padding: 8px; display: grid; gap: 6px; }
+.bloques-bandeja { display: flex; flex-wrap: wrap; gap: 8px; }
+.bloque { text-align: left; border: 2px solid #8fa0ff; border-radius: 10px; padding: 9px 12px; background: #2c3570; color: #fff; box-shadow: 0 3px 0 #11132e; font-size: 16px; display: flex; gap: 8px; align-items: center; }
+.bloque code { white-space: pre; font-size: 16px; }
+.bloque.puesto { background: #1d2a52; border-color: var(--turquesa); width: 100%; }
+.bloque .num { color: #6b7399; font: 700 12px ui-monospace, monospace; }
+.sangria { color: #4a529c; }
+.runa-libro { background: #070b1e; border: 1px solid #2b3a8c; border-radius: 10px; padding: 8px 10px; }
+.runa-libro b { color: var(--oro2); font-size: 14px; }
+.runa-libro pre { font-size: 13px; color: #7dfff0; margin-top: 4px; white-space: pre-wrap; }

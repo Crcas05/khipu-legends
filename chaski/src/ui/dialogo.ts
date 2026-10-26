@@ -18,7 +18,8 @@ function aprender(palabra: string): boolean {
   return true;
 }
 
-function preparar(texto: string) {
+function preparar(original: string) {
+  const texto = original.replace(/\{nombre\}/g, estado.nombre || "Chaski");
   const nuevas: string[] = [];
   const seguro = texto.replace(/&/g, "&amp;").replace(/</g, "&lt;");
   const html = seguro.replace(/\[\[([^\]]+)\]\]/g, (_, p: string) => {

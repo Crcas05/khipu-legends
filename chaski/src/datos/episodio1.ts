@@ -3,7 +3,10 @@
 // Las palabras en quechua van entre [[ ]] y se guardan en el Simi Qillqa.
 // (Pendiente: validar cada palabra con hablantes nativos antes de publicar.)
 
-export type Quien = "chaski" | "mama" | "tuki" | "narrador";
+import type { Reto } from "../ui/taller";
+import type { RetoBloques } from "../ui/bloques";
+
+export type Quien = "chaski" | "mama" | "tuki" | "amaru" | "narrador";
 export interface Linea {
   quien: Quien;
   texto: string;
@@ -13,6 +16,7 @@ export const NOMBRES: Record<Quien, string> = {
   chaski: "Chaski",
   mama: "Mama Khipu",
   tuki: "Tuki",
+  amaru: "Amaru",
   narrador: "",
 };
 
@@ -23,12 +27,17 @@ export const PALABRAS: Record<string, string> = {
   kallpa: "fuerza",
   yachay: "saber, conocimiento",
   sulpayki: "gracias",
+  sacha: "monte, árbol",
+  rumi: "piedra",
+  punku: "puerta",
+  atipay: "vencer",
+  yanapay: "ayudar",
 };
 
 export const OBJETIVOS: Record<string, string> = {
-  hablar1: "Habla con Mama Khipu (sigue el ◆ amarillo)",
-  fuente: "Toca 👁 OJO y luego el código de la fuente",
-  techo: "Con el 👁 OJO, toca el código de una casa",
+  hablar1: "Habla con Mama Khipu: sigue la flecha dorada ➜",
+  fuente: "Ve a la fuente, toca 👁 OJO y luego su código",
+  techo: "Sigue la flecha a la casa y toca su código con el 👁 OJO",
   hablar2: "Vuelve con Mama Khipu",
   taller: "Escribe tu primera runa en el Taller",
   final: "Habla con Mama Khipu",
@@ -36,15 +45,13 @@ export const OBJETIVOS: Record<string, string> = {
 };
 
 export const INTRO: Linea[] = [
-  { quien: "narrador", texto: "Pueblo de Qhapaq, en lo alto de los Andes." },
-  { quien: "narrador", texto: "Anoche, el Bug Ch'aqwa desordenó el código del mundo. La fuente se secó y las casas perdieron su color." },
-  { quien: "tuki", texto: "¡Kraa! Despierta, Chaski. Mama Khipu te está buscando en la plaza. ¡Sigue el rombo amarillo!" },
+  { quien: "tuki", texto: "¡Lo espantaste, {nombre}! Pero el Bug Ch'aqwa ya desordenó el pueblo: la fuente se secó y las casas perdieron su color." },
+  { quien: "tuki", texto: "Mama Khipu sabe cómo arreglarlo. ¡Sigue la flecha dorada del suelo! Kraa!" },
 ];
 
 export const MAMA_1: Linea[] = [
-  { quien: "mama", texto: "[[Allillanchu]], Chaski. Qué bueno que llegaste." },
+  { quien: "mama", texto: "[[Allillanchu]], {nombre}. Tuki me contó que ya usaste tus primeras runas. ¡Qué bueno que llegaste!" },
   { quien: "mama", texto: "El Bug Ch'aqwa desordenó las cuerdas de nuestro pueblo. Mira la fuente: el [[yaku]] ya no corre." },
-  { quien: "mama", texto: "Pero tú eres un Chaski. Puedes ver el mundo como realmente es: código." },
   { quien: "mama", texto: "Te entrego el Ojo del Khipukamayuq. Ábrelo y mira la fuente." },
   { quien: "tuki", texto: "Toca el botón 👁 OJO y después toca el código que brilla sobre la fuente. ¡Kraa!" },
 ];
@@ -62,9 +69,23 @@ export const TECHO_LISTO: Linea[] = [
 ];
 
 export const MAMA_2: Linea[] = [
-  { quien: "mama", texto: "Los Chaski escriben sus runas en el Taller, con calma, antes de cada batalla." },
-  { quien: "mama", texto: "Escribe tu primera runa: guarda tu nombre y tu [[kallpa]] en variables. Luego muéstralos con print." },
+  { quien: "mama", texto: "Ahora aprenderás a crear runas. Primero ármala con bloques; después la escribirás tú solo." },
 ];
+
+export const MAMA_TALLER: Linea[] = [
+  { quien: "mama", texto: "¡Bien armada! Ahora escríbela tú en el Taller: guarda tu nombre y tu [[kallpa]], y muéstralos con print." },
+];
+
+/** Escalón "armar": bloques con trampas (orden, comillas, mayúsculas). */
+export const BLOQUES_1: RetoBloques = {
+  quien: "mama",
+  titulo: "Arma tu primera runa",
+  mision: "Arma una runa que guarde el nombre del héroe y lo presente. ¡Cuidado con las líneas tramposas!",
+  correctas: ['heroe = "Chaski"', 'print("Soy", heroe)'],
+  trampas: ["heroe = Chaski", 'Print("Soy", heroe)', 'print("Soy", "heroe")'],
+  salidaEsperada: ["Soy Chaski"],
+  teoria: "Python lee <b>de arriba hacia abajo</b>: primero se crea la variable y después se usa. Y distingue mayúsculas: <code>print</code> funciona, <code>Print</code> no.",
+};
 
 export const FINAL: Linea[] = [
   { quien: "mama", texto: "[[Sulpayki]], Chaski. Hoy aprendiste tu primer [[yachay]]: las variables." },
@@ -108,10 +129,19 @@ export const REPARAR_TECHO: Reparacion = {
 };
 
 /** Reto del Taller: código Python real que se ejecuta en el dispositivo. */
-export const RETO_TALLER = {
+export const RETO_TALLER: Reto = {
+  id: "variables",
+  variables: ["nombre", "kallpa"],
+  validar: ([tipoNombre, tipoKallpa], visibles) => {
+    if (tipoNombre !== "str") return '<b>nombre</b> debe ser un texto. Los textos van entre comillas: <code>nombre = "Chaski"</code>';
+    if (tipoKallpa !== "int") return "<b>kallpa</b> debe ser un número entero, sin comillas: <code>kallpa = 10</code>";
+    if (!visibles.length) return "Casi. Te falta mostrar tu nombre con <code>print(nombre)</code>.";
+    return null;
+  },
+  exito: "¡Kraa! ¡Runa completada! Guardaste un texto (str) y un número (int), y los mostraste con print. 🎉",
   titulo: "Runa 1 · Tus primeras variables",
   enunciado: [
-    "Crea la variable <b>nombre</b> con el texto <code>\"Chaski\"</code>.",
+    "Crea la variable <b>nombre</b> con tu nombre entre comillas, por ejemplo <code>\"Chaski\"</code>.",
     "Crea la variable <b>kallpa</b> con el número <code>10</code>.",
     "Muestra tu nombre con <code>print(nombre)</code>.",
   ],

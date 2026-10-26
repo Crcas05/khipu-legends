@@ -1,7 +1,9 @@
 // Barra superior: objetivo de la misión, kallpa y avisos.
 
 import { estado } from "../estado";
-import { OBJETIVOS } from "../datos/episodio1";
+import { OBJETIVOS as OBJ1 } from "../datos/episodio1";
+import { OBJETIVOS_2 } from "../datos/episodio2";
+const OBJETIVOS: Record<string, string> = { ...OBJ1, ...OBJETIVOS_2 };
 import { sonido } from "../sonido";
 
 let temporizador = 0;
@@ -22,6 +24,8 @@ export function actualizarHud() {
   document.getElementById("hud-kallpa")!.textContent = String(estado.kallpa);
   document.getElementById("hud-nivel")!.textContent = String(estado.nivel);
   document.getElementById("hud-palabras")!.textContent = String(estado.palabras.length);
+  document.getElementById("hud-racha")!.textContent = String(estado.racha);
+  document.getElementById("chip-racha")!.hidden = estado.racha < 1;
 }
 
 /** Muestra "+N" flotando sobre el contador de kallpa. */

@@ -6,6 +6,7 @@ import { PALABRAS } from "../datos/episodio1";
 import { sonido } from "../sonido";
 
 export const LOGROS: Record<string, { icono: string; nombre: string; texto: string }> = {
+  prologo: { icono: "🌅", nombre: "Primeras runas", texto: "Aprendiste 4 conceptos en un minuto" },
   ojo: { icono: "👁", nombre: "Primer vistazo", texto: "Abriste el Ojo del Khipukamayuq" },
   fuente: { icono: "💧", nombre: "Guardián del yaku", texto: "Reparaste la fuente con True" },
   techo: { icono: "🏠", nombre: "Pintor de wasis", texto: "Usaste tu primer texto (str)" },
@@ -13,6 +14,11 @@ export const LOGROS: Record<string, { icono: string; nombre: string; texto: stri
   nudos: { icono: "✨", nombre: "Ojo atento", texto: "Encontraste los 3 nudos dorados" },
   simi: { icono: "📖", nombre: "Rimaq", texto: "Aprendiste 6 palabras en quechua" },
   episodio1: { icono: "⭐", nombre: "Despertar del Chaski", texto: "Completaste el Episodio 1" },
+  ecos: { icono: "👣", nombre: "Eco triple", texto: "Usaste for para estar en 3 lugares" },
+  forja: { icono: "⚡", nombre: "Forjador de runas", texto: "Escribiste tu primera función con def" },
+  jefe: { icono: "🐛", nombre: "Cazador de Bugs", texto: "Venciste al Bug Ch'aqwa" },
+  racha3: { icono: "🔥", nombre: "Constancia andina", texto: "Jugaste 3 días seguidos" },
+  episodio2: { icono: "🌿", nombre: "Guardián de la selva", texto: "Completaste el Episodio 2" },
 };
 export const TOTAL_NUDOS = 3;
 
@@ -66,6 +72,14 @@ export function abrirSimiQillqa(): Promise<void> {
       </div>
       <h3>Nudos dorados · ${estado.nudos.length}/${TOTAL_NUDOS}</h3>
       <p class="simi-pista">${estado.nudos.length < TOTAL_NUDOS ? "Pista: solo se ven con el 👁 Ojo abierto. Busca detrás de las casas y cerca de los andenes." : "¡Los encontraste todos!"}</p>
+      <h3>📜 Libro de runas · ${Object.keys(estado.runas).length}</h3>
+      ${
+        Object.keys(estado.runas).length
+          ? Object.entries(estado.runas)
+              .map(([k, codigo]) => `<div class="runa-libro"><b>${k === "rayo" ? "⚡ Runa rayo (función)" : k === "variables" ? "📦 Primera runa (variables)" : k}</b><pre>${codigo.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</pre></div>`)
+              .join("")
+          : '<p class="simi-pista">Aquí se guardarán las runas que escribas en el Taller.</p>'
+      }
       <h3>Insignias · ${estado.logros.length}/${Object.keys(LOGROS).length}</h3>
       <div class="simi-logros">
         ${Object.entries(LOGROS)

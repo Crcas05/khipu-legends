@@ -11,6 +11,7 @@ import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTextur
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { material, pieza } from "./personajes";
+import type { Modelo } from "./modelos";
 
 // ---------------------------------------------------------------------------
 // Tejidos andinos dibujados en el momento (sin descargar imágenes)
@@ -87,8 +88,33 @@ export class Chaski {
   private tiempo = 0;
   private angulo = 0;
   private festejo = 0;
+  private modelo: Modelo | null = null;
+  private esFantasma = false;
 
-  constructor(escena: Scene) {
+  /** Cambia el cuerpo armado con formas por un modelo 3D animado (ya colocado dentro de raiz). */
+  vestir(modelo: Modelo, extras: Mesh[] = []) {
+    this.cuerpo.setEnabled(false);
+    this.modelo = modelo;
+    this.mallas = [...modelo.mallas, ...extras];
+    if (this.esFantasma) this.fantasma();
+  }
+
+  get tieneModelo() {
+    return this.modelo !== null;
+  }
+
+  /** Lanza la animación de hechizo (al atacar). */
+  lanzar() {
+    this.modelo?.accion("Spellcast_Shoot", 0.9);
+  }
+
+  /** Reacciona a un golpe. */
+  golpeado() {
+    this.modelo?.accion("Hit_A", 0.6);
+  }
+
+  /** amaru = true arma a Amaru (montera, trenzas largas, pollera y bastón del río). */
+  constructor(escena: Scene, amaru = false) {
     const piel = material(escena, "#c98a5c");
     const pelo = material(escena, "#1c1410", 0.3);
     const marron = material(escena, "#6b4026");
@@ -104,7 +130,14 @@ export class Chaski {
       linea(c, 0, h, w, "#d9c49a");
       for (let y = 0; y < h; y += 32) rombos(c, y + 6, 20, w, "#d9c49a", "#c8102e", "#2a6f5e", 10);
     }, 256, 256);
-    const poncho = tejido(escena, "poncho", (c, w, h) => {
+    const poncho = amaru ? tejido(escena, "poncho-amaru", (c, w, h) => {
+      linea(c, 0, h, w, "#d6336c");
+      linea(c, h * 0.2, 6, w, "#f5b83d");
+      rombos(c, h * 0.24, 44, w, "#1fa596", "#f7f1e6", "#d6336c", 14);
+      linea(c, h * 0.24 + 44, 6, w, "#f5b83d");
+      rombos(c, h * 0.76, 38, w, "#f7f1e6", "#1fa596", "#141414", 18);
+      for (let x = 0; x < w; x += 8) linea2(c, x, h - 14, 4, 14, "#f5b83d");
+    }) : tejido(escena, "poncho", (c, w, h) => {
       linea(c, 0, h, w, "#c8102e");
       linea(c, h * 0.18, 6, w, "#f5b83d");
       rombos(c, h * 0.22, 46, w, "#f7f1e6", "#c8102e", "#141414", 14);
@@ -126,7 +159,7 @@ export class Chaski {
       linea(c, h * 0.9, h * 0.1, w, "#c8102e");
     });
 
-    this.raiz = new TransformNode("chaski", escena);
+    this.raiz = new TransformNode(amaru ? "amaru" : "chaski", escena);
     this.cuerpo = new TransformNode("chaski-cuerpo", escena);
     this.cuerpo.parent = this.raiz;
     const m = (x: Mesh) => (this.mallas.push(x), x);
@@ -200,6 +233,31 @@ export class Chaski {
     const sonrisa = m(pieza(MeshBuilder.CreateDisc("sonrisa", { radius: 0.09, tessellation: 16, arc: 0.5 }, escena), this.cuerpo, boca, 0, cabezaY - 0.22, 0.465));
     sonrisa.rotation.set(0, Math.PI, Math.PI);
 
+    if (amaru) {
+      // Montera roja (sombrero plano tradicional), pelo largo con trenzas y bastón con luz del río
+      const sombrero = material(escena, "#c8102e");
+      const oro = material(escena, "#f5b83d", 0.4);
+      m(pieza(MeshBuilder.CreateCylinder("montera", { height: 0.12, diameter: 1.5, tessellation: 24 }, escena), this.cuerpo, sombrero, 0, cabezaY + 0.42, 0));
+      m(pieza(MeshBuilder.CreateCylinder("montera-copa", { height: 0.22, diameter: 0.8, tessellation: 20 }, escena), this.cuerpo, sombrero, 0, cabezaY + 0.55, 0));
+      m(pieza(MeshBuilder.CreateTorus("montera-banda", { diameter: 1.32, thickness: 0.05, tessellation: 28 }, escena), this.cuerpo, oro, 0, cabezaY + 0.47, 0));
+      m(pieza(MeshBuilder.CreateCapsule("melena", { radius: 0.42, height: 1.1, tessellation: 10 }, escena), this.cuerpo, pelo, 0, cabezaY - 0.3, -0.18));
+      for (const lado of [-1, 1]) {
+        const pivote = new TransformNode("trenza", escena);
+        pivote.parent = this.cuerpo;
+        pivote.position.set(0.42 * lado, cabezaY - 0.1, 0.05);
+        m(pieza(MeshBuilder.CreateCapsule("trenza", { radius: 0.08, height: 0.8, tessellation: 6 }, escena), pivote, pelo, 0, -0.4, 0));
+        m(pieza(MeshBuilder.CreateSphere("lazo", { diameter: 0.13, segments: 6 }, escena), pivote, oro, 0, -0.82, 0));
+        this.orejeras.push(pivote);
+      }
+      m(pieza(MeshBuilder.CreateCylinder("pollera", { height: 0.5, diameterTop: 0.9, diameterBottom: 1.25, tessellation: 18 }, escena), this.cuerpo, poncho, 0, 0.5, 0));
+      const baston = m(pieza(MeshBuilder.CreateCylinder("baston", { height: 1.7, diameter: 0.07, tessellation: 6 }, escena), this.brazoD, material(escena, "#7a4b2a"), 0.05, -0.35, 0.18));
+      baston.rotation.x = 0.15;
+      const luz = material(escena, "#4ff0dc", 0.6);
+      luz.emissiveColor = new Color3(0.2, 0.85, 0.8);
+      m(pieza(MeshBuilder.CreateSphere("luz-rio", { diameter: 0.3, segments: 10 }, escena), this.brazoD, luz, 0.05, 0.5, 0.3));
+      return;
+    }
+
     // Chullo tejido con orejeras, trenzas y pompón
     const chulloY = cabezaY + 0.3;
     m(pieza(MeshBuilder.CreateCylinder("chullo", { height: 0.5, diameterTop: 0.62, diameterBottom: 1.1, tessellation: 20 }, escena), this.cuerpo, chullo, 0, chulloY, 0));
@@ -217,14 +275,38 @@ export class Chaski {
     }
   }
 
+  /** Lo vuelve un eco fantasma (para la runa for). */
+  fantasma() {
+    this.esFantasma = true;
+    for (const malla of this.mallas) {
+      malla.visibility = 0.5;
+      malla.isPickable = false;
+    }
+  }
+
   /** Salta de alegría un momento (al lograr un reto). */
   festejar() {
+    if (this.modelo) {
+      this.modelo.accion("Cheer", 1.6);
+      return;
+    }
     this.festejo = 1.2;
   }
 
   /** dx, dz: dirección de movimiento (-1 a 1). dt en segundos. */
   actualizar(dx: number, dz: number, dt: number) {
     const fuerza = Math.min(1, Math.hypot(dx, dz));
+    if (this.modelo) {
+      if (fuerza > 0.05) {
+        const objetivo = Math.atan2(dx, dz);
+        let diferencia = objetivo - this.angulo;
+        diferencia = Math.atan2(Math.sin(diferencia), Math.cos(diferencia));
+        this.angulo += diferencia * Math.min(1, dt * 12);
+        this.raiz.rotation.y = this.angulo;
+      }
+      this.modelo.mover(fuerza, dt);
+      return;
+    }
     if (fuerza > 0.05) {
       const objetivo = Math.atan2(dx, dz);
       let diferencia = objetivo - this.angulo;

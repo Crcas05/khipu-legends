@@ -2,7 +2,7 @@
 // Cuando cambies archivos del juego, sube el número de VERSION para que los
 // celulares descarguen la versión nueva.
 
-const VERSION = "kl-v2";
+const VERSION = "kl-v3";
 const CACHE_JUEGO = `juego-${VERSION}`;
 const CACHE_PYTHON = "python-314.0.7"; // Pyodide: solo se descarga una vez
 
@@ -44,6 +44,8 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET") return;
+  // Los juegos nuevos (/chaski/ y /selva/) siempre se cargan frescos desde internet
+  if (url.pathname.includes("/chaski/") || url.pathname.includes("/selva/")) return;
 
   // Python (Pyodide): primero lo guardado; si no está, se descarga y se guarda.
   if (url.hostname === "cdn.jsdelivr.net" && url.pathname.startsWith("/pyodide/")) {

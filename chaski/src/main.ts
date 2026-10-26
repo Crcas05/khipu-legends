@@ -13,21 +13,31 @@ import "@babylonjs/core/Rendering/outlineRenderer";
 import { Vector3, Matrix } from "@babylonjs/core/Maths/math.vector";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { Ray } from "@babylonjs/core/Culling/ray";
+import "@babylonjs/core/Culling/ray";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { crearMundo, resolverChoques } from "./mundo";
 import { Tuki, crearLlama } from "./personajes";
 import { Chaski, MamaKhipu, crearMarcador } from "./heroes";
 import { entrada, iniciarControles } from "./controles";
-import { estado, guardar, hayPartida, reiniciar, yaPaso, type Paso } from "./estado";
-import { INTRO, MAMA_1, FUENTE_LISTA, TECHO_LISTO, MAMA_2, FINAL, REPARAR_FUENTE, REPARAR_TECHO, APRENDIDO } from "./datos/episodio1";
+import { estado, guardar, hayPartida, reiniciar, yaPaso, enSelva, type Paso } from "./estado";
+import { BLOQUES_1, MAMA_TALLER, RETO_TALLER, INTRO, MAMA_1, FUENTE_LISTA, TECHO_LISTO, MAMA_2, FINAL, REPARAR_FUENTE, REPARAR_TECHO, APRENDIDO } from "./datos/episodio1";
 import { hablar, dialogoAbierto } from "./ui/dialogo";
 import { aviso, actualizarHud, ganarKallpa } from "./ui/hud";
 import { abrirReparacion } from "./ui/reparar";
 import { abrirTaller } from "./ui/taller";
 import { elegirHeroe, nuevoNivel, proximamente } from "./ui/pantallas";
+import { prologo, tarjeta, voz, teoria, elegir, esperarBoton, cerrarTarjeta } from "./ui/prologo";
+import { crearSelva, PIEDRAS, PUERTA, AMARU_POS, INICIO_SELVA, LIMITE_SELVA } from "./selva";
+import { Jefe, Batalla } from "./batalla";
+import { abrirBloques } from "./ui/bloques";
+import { BLOQUES_2, LLEGADA, AMARU_1, ECOS_LISTOS, ANTES_BATALLA, VICTORIA, APRENDIDO_2, RETO_RAYO } from "./datos/episodio2";
 import { desbloquear, abrirSimiQillqa, TOTAL_NUDOS } from "./ui/logros";
 import { sonido, despertarAudio, iniciarMusica, alternarSilencio, estaSilenciado } from "./sonido";
+import { crearModelo, ponerChullo, ponerMontera } from "./modelos";
 import { crearChorro, estallido, crearPolvo, crearDestello, Sacudida } from "./efectos";
 import type { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 
@@ -57,8 +67,8 @@ function ajustarCamara() {
   const vertical = lienzo.clientHeight > lienzo.clientWidth;
   camara.fovMode = vertical ? ArcRotateCamera.FOVMODE_HORIZONTAL_FIXED : ArcRotateCamera.FOVMODE_VERTICAL_FIXED;
   camara.fov = vertical ? 1.05 : 0.75;
-  camara.beta = vertical ? 0.72 : 0.92;
-  radioBase = vertical ? 18 : 20;
+  camara.beta = vertical ? 0.56 : 0.82;
+  radioBase = vertical ? 19 : 19;
   camara.radius = radioBase;
   document.body.classList.toggle("vertical", vertical);
 }
@@ -76,7 +86,7 @@ sol.intensity = 1.05;
 // ---------------------------------------------------------------------------
 const mundo = crearMundo(escena);
 const chaski = new Chaski(escena);
-chaski.raiz.position.set(0, 0, -8);
+chaski.raiz.position.set(0, 0, -6);
 const tuki = new Tuki(escena);
 const yaru = crearLlama(escena, 4, -4);
 yaru.raiz.rotation.y = -2.4;
@@ -86,7 +96,69 @@ const mama = new MamaKhipu(escena, MAMA_POS.x, MAMA_POS.z, 2.7);
 mundo.choques.push({ x: MAMA_POS.x, z: MAMA_POS.z, r: 0.9 });
 const marcador = crearMarcador(escena);
 marcador.position.set(MAMA_POS.x, 3.6, MAMA_POS.z);
-const personajes: Mesh[] = [...chaski.mallas, ...tuki.mallas, ...yaru.mallas, ...mama.mallas];
+// Región 2: la selva, Amaru y los ecos fantasma
+const selva = crearSelva(escena);
+const amaru = new Chaski(escena, true);
+amaru.raiz.position.copyFrom(AMARU_POS);
+amaru.raiz.rotation.y = Math.PI + 0.4;
+amaru.raiz.setEnabled(false);
+selva.choques.push({ x: AMARU_POS.x, z: AMARU_POS.z, r: 0.9 });
+const ecos: Chaski[] = [];
+for (let i = 0; i < 4; i++) {
+  const e = new Chaski(escena);
+  e.fantasma();
+  e.raiz.setEnabled(false);
+  ecos.push(e);
+}
+const jefe = new Jefe(escena);
+let region: "plaza" | "selva" = "plaza";
+let personajes: Mesh[] = [];
+function listarPersonajes() {
+  personajes = [...chaski.mallas, ...tuki.mallas, ...yaru.mallas, ...mama.mallas, ...amaru.mallas];
+}
+listarPersonajes();
+
+// Flecha guía en el suelo: siempre apunta al objetivo (nadie se pierde)
+const guia = new TransformNode("guia", escena);
+guia.scaling.setAll(1.6);
+const oroGuia = new StandardMaterial("m-guia", escena);
+oroGuia.diffuseColor = new Color3(1, 0.82, 0.3);
+oroGuia.emissiveColor = new Color3(0.9, 0.62, 0.1);
+oroGuia.alpha = 0.9;
+const asta = MeshBuilder.CreateBox("guia-asta", { width: 0.28, height: 0.06, depth: 0.9 }, escena);
+asta.parent = guia;
+asta.position.z = 0.2;
+const punta = MeshBuilder.CreateCylinder("guia-punta", { height: 0.06, diameter: 0.95, tessellation: 3 }, escena);
+punta.parent = guia;
+punta.position.z = 0.85;
+punta.rotation.y = -Math.PI / 2;
+for (const m of [asta, punta]) {
+  m.material = oroGuia;
+  m.isPickable = false;
+}
+function destinoGuia(): Vector3 | null {
+  if (region === "selva") return ["selva", "victoria"].includes(estado.paso) ? AMARU_POS : null;
+  if (["hablar1", "hablar2", "final", "taller"].includes(estado.paso)) return MAMA_POS;
+  if (estado.paso === "fuente") return Vector3.Zero();
+  if (estado.paso === "techo") return new Vector3(-12, 0, 12);
+  return null;
+}
+
+// Lo que tapa al jugador se vuelve transparente
+const TAPAN = new Set(["casa", "techo", "puerta", "copa", "tronco", "anden", "pirqa"]);
+let transparentes: Mesh[] = [];
+
+// Escudo del prólogo (burbuja turquesa)
+const escudoMat = new StandardMaterial("m-escudo", escena);
+escudoMat.diffuseColor = new Color3(0.3, 0.95, 0.9);
+escudoMat.emissiveColor = new Color3(0.15, 0.7, 0.65);
+escudoMat.alpha = 0.32;
+const escudo = MeshBuilder.CreateSphere("escudo", { diameter: 3.4, segments: 16 }, escena);
+escudo.material = escudoMat;
+escudo.parent = chaski.raiz;
+escudo.position.y = 1.4;
+escudo.isPickable = false;
+escudo.setEnabled(false);
 
 // VFX
 const chorro = crearChorro(escena, new Vector3(0, 2.2, 0));
@@ -113,7 +185,7 @@ function aplicarValores() {
 // ---------------------------------------------------------------------------
 let sombras: ShadowGenerator | null = null;
 let calidad: Calidad = "medio";
-const SIN_CONTORNO = ["pasto", "plaza", "camino", "borde", "agua", "apu", "nieve", "glitch", "marcador", "mejilla", "sonrisa", "ojo", "brillo", "pupila", "iris", "esclera", "ceja", "nudo", "cuerda", "mecha"];
+const SIN_CONTORNO = ["helecho", "sello", "runa", "rumi", "pasto", "plaza", "camino", "borde", "agua", "apu", "nieve", "glitch", "marcador", "mejilla", "sonrisa", "ojo", "brillo", "pupila", "iris", "esclera", "ceja", "nudo", "cuerda", "mecha"];
 function aplicarCalidad(nueva: Calidad) {
   calidad = nueva;
   sombras?.dispose();
@@ -125,12 +197,12 @@ function aplicarCalidad(nueva: Calidad) {
     sombras.usePercentageCloserFiltering = true;
     sombras.bias = 0.002;
     for (const m of personajes) sombras.addShadowCaster(m);
-    for (const m of mundo.mallas) {
+    for (const m of [...mundo.mallas, ...selva.mallas]) {
       if (["pasto", "plaza", "camino"].includes(m.name)) m.receiveShadows = true;
       else if (m.position.length() < 40) sombras.addShadowCaster(m);
     }
   }
-  for (const m of [...personajes, ...mundo.mallas]) {
+  for (const m of [...personajes, ...mundo.mallas, ...selva.mallas]) {
     m.renderOutline = nueva !== "bajo" && !SIN_CONTORNO.includes(m.name);
     m.outlineColor = new Color3(0.1, 0.07, 0.12);
     m.outlineWidth = 0.03;
@@ -150,6 +222,7 @@ interface Etiqueta {
   editable: () => boolean;
   visible?: () => boolean;
   tesoro?: boolean;
+  region?: "plaza" | "selva";
   el?: HTMLDivElement;
 }
 const ETIQUETAS: Etiqueta[] = [
@@ -158,6 +231,9 @@ const ETIQUETAS: Etiqueta[] = [
   { clave: "casa", posicion: () => new Vector3(-12, 4.9, 12), texto: () => `casa.techo = "${valores.techo}"`, editable: () => estado.paso === "techo" },
   { clave: "yaru", posicion: () => new Vector3(4, 3.4, -4), texto: () => `yaru.animo = "${valores.animo}"`, editable: () => false },
   { clave: "mama", posicion: () => new Vector3(MAMA_POS.x, 3.5, MAMA_POS.z), texto: () => `mama_khipu.rol = "guardiana"`, editable: () => false },
+  { clave: "punku", region: "selva", posicion: () => PUERTA.add(new Vector3(0, 6.6, 0)), texto: () => `punku.abierta = ${yaPaso("ecos") ? "True" : "False"}`, editable: () => false },
+  { clave: "rumi", region: "selva", posicion: () => new Vector3(0, 2.2, 7), texto: () => `rumi = [${PIEDRAS.map((_, i) => (rumiEncendidas[i] ? "True" : "False")).join(", ")}]`, editable: () => false },
+  { clave: "amaru", region: "selva", posicion: () => amaru.raiz.position.add(new Vector3(0, 3.6, 0)), texto: () => `amaru.magia = "río"`, editable: () => false },
   ...NUDOS.map((p, i) => ({
     clave: `nudo${i}`,
     posicion: () => p.add(new Vector3(0, 1.3, 0)),
@@ -175,6 +251,7 @@ function refrescarEtiquetas() {
   for (const e of ETIQUETAS) {
     e.el = undefined;
     if (e.visible && !e.visible()) continue;
+    if ((e.region ?? "plaza") !== region && e.clave !== "chaski") continue;
     const el = document.createElement("div");
     el.className = "etiqueta-codigo" + (e.editable() ? " editable" : "") + (e.tesoro ? " tesoro" : "");
     el.textContent = e.texto();
@@ -324,6 +401,7 @@ async function reparar(clave: string) {
 }
 
 async function hablarConMama() {
+  if (region === "selva") return hablarConAmaru();
   await enCalma(async () => {
     switch (estado.paso) {
       case "hablar1":
@@ -334,7 +412,10 @@ async function hablarConMama() {
         break;
       case "hablar2":
         await hablar(MAMA_2);
+        await abrirBloques(BLOQUES_1);
+        ganarKallpa(5);
         avanzar("taller");
+        await hablar(MAMA_TALLER);
         await usarTaller();
         break;
       case "final":
@@ -345,25 +426,267 @@ async function hablarConMama() {
         desbloquear("episodio1");
         chaski.festejar();
         await nuevoNivel(APRENDIDO);
-        if ((await proximamente()) === "repetir") {
-          const heroe = estado.heroe;
-          reiniciar();
-          estado.heroe = heroe;
-          guardar();
-          location.reload();
-        }
+        await despuesDelEpisodio1();
         break;
       case "taller":
         await usarTaller();
         break;
+      case "completo":
+        await hablar([{ quien: "mama", texto: "El Bug Ch'aqwa se esconde en la selva, {nombre}. ¿Estás listo para el viaje?" }]);
+        await despuesDelEpisodio1();
+        break;
       default:
-        await hablar([{ quien: "mama", texto: estado.paso === "completo" ? "Sigue explorando, Chaski. La selva te espera." : "Usa el Ojo, Chaski. El pueblo te necesita." }]);
+        await hablar([{ quien: "mama", texto: "Usa el Ojo, {nombre}. El pueblo te necesita." }]);
     }
   });
 }
 
+async function despuesDelEpisodio1() {
+  const eleccion = await proximamente();
+  if (eleccion === "repetir") {
+    const { heroe, nombre } = estado;
+    reiniciar();
+    Object.assign(estado, { heroe, nombre, paso: "intro" });
+    guardar();
+    location.reload();
+  } else if (eleccion === "selva") {
+    avanzar("selva");
+    await viajarA("selva");
+    await hablar(LLEGADA);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Regiones: cambiar de la plaza a la selva
+// ---------------------------------------------------------------------------
+async function viajarA(destino: "plaza" | "selva") {
+  const velo = $("velo");
+  velo.hidden = false;
+  velo.classList.add("cubre");
+  await new Promise((r) => window.setTimeout(r, 450));
+  if (ojoAbierto) alternarOjo(false);
+  region = destino;
+  const selvaActiva = destino === "selva";
+  for (const m of mundo.mallas) m.setEnabled(!selvaActiva);
+  for (const g of mundo.glitches) g.setEnabled(!selvaActiva);
+  mama.raiz.setEnabled(!selvaActiva);
+  yaru.raiz.setEnabled(!selvaActiva);
+  marcador.setEnabled(!selvaActiva);
+  if (selvaActiva) chorro.stop();
+  else if (valores.agua) chorro.start();
+  selva.raiz.setEnabled(selvaActiva);
+  amaru.raiz.setEnabled(selvaActiva);
+  chaski.raiz.position.copyFrom(selvaActiva ? INICIO_SELVA : new Vector3(0, 0, -6));
+  camara.target.copyFrom(chaski.raiz.position);
+  escena.fogColor = selvaActiva ? new Color3(0.55, 0.72, 0.55) : new Color3(0.72, 0.86, 0.95);
+  escena.fogStart = selvaActiva ? 28 : 45;
+  escena.fogEnd = selvaActiva ? 70 : 95;
+  sol.intensity = selvaActiva ? 0.9 : 1.05;
+  document.body.dataset.region = destino;
+  actualizarBotones();
+  await new Promise((r) => window.setTimeout(r, 200));
+  velo.classList.remove("cubre");
+  window.setTimeout(() => (velo.hidden = true), 500);
+}
+
+// ---------------------------------------------------------------------------
+// Episodio 2: Ecos del Chaski (for) y la batalla
+// ---------------------------------------------------------------------------
+const rumiEncendidas = [false, false, false];
+function pintarRumi() {
+  rumiEncendidas.forEach((on, i) => selva.control.activarPiedra(i, on));
+  refrescarEtiquetas();
+}
+
+/** Lanza n ecos fantasma desde Chaski hasta cada destino (caminando). */
+function lanzarEcos(destinos: Vector3[], quedarse: boolean): Promise<void> {
+  const origen = chaski.raiz.position.clone();
+  return new Promise((r) => {
+    const activos = destinos.map((d, i) => {
+      const e = ecos[i];
+      e.raiz.setEnabled(true);
+      e.raiz.position.copyFrom(origen);
+      estallido(escena, origen.add(new Vector3(0, 1.5, 0)), ["#4ff0dc", "#ffffff"], 30, 3);
+      return { e, d };
+    });
+    sonido.agua();
+    let t = 0;
+    const obs = escena.onBeforeRenderObservable.add(() => {
+      const dt = Math.min(motor.getDeltaTime() / 1000, 0.05);
+      t += dt;
+      let llegaron = true;
+      for (const { e, d } of activos) {
+        const p = e.raiz.position;
+        const dx = d.x - p.x;
+        const dz = d.z - p.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist > 0.15) {
+          llegaron = false;
+          const v = Math.min(dist, 7 * dt);
+          p.x += (dx / dist) * v;
+          p.z += (dz / dist) * v;
+          e.actualizar(dx / dist, dz / dist, dt);
+        } else e.actualizar(0, 0, dt);
+      }
+      if (llegaron || t > 4) {
+        escena.onBeforeRenderObservable.remove(obs);
+        if (!quedarse) window.setTimeout(() => activos.forEach(({ e }) => e.raiz.setEnabled(false)), 900);
+        r();
+      }
+    });
+  });
+}
+function guardarEcos() {
+  for (const e of ecos) e.raiz.setEnabled(false);
+}
+
+async function rompecabezasEcos() {
+  for (;;) {
+    rumiEncendidas.fill(false);
+    pintarRumi();
+    guardarEcos();
+    const c = tarjeta(`
+      ${voz("amaru", "¿Cuántas veces quieres repetir tu paso? Cada repetición crea un <b>eco</b> que corre a una [[rumi]].".replace(/\[\[|\]\]/g, ""))}
+      <pre class="codigo-mini"><span class="fn">for</span> <span class="var">i</span> <span class="fn">in</span> <span class="fn">range</span>(<span class="valor">___</span>):
+    eco(rumi[<span class="var">i</span>])</pre>
+      <div class="prologo-opciones">${[1, 2, 3].map((n) => `<button class="opcion" data-n="${n}"><code>range(${n})</code></button>`).join("")}</div>`);
+    const n = await new Promise<number>((r) =>
+      c.querySelectorAll<HTMLButtonElement>("[data-n]").forEach((b) => b.addEventListener("click", () => (sonido.toque(), r(Number(b.dataset.n)))))
+    );
+    cerrarTarjeta();
+    await lanzarEcos(PIEDRAS.slice(0, n), true);
+    for (let i = 0; i < n; i++) {
+      rumiEncendidas[i] = true;
+      pintarRumi();
+      sonido.kallpa();
+      estallido(escena, PIEDRAS[i].add(new Vector3(0, 0.6, 0)), ["#ffd166", "#ffffff"], 40, 4);
+      await new Promise((r) => window.setTimeout(r, 300));
+    }
+    if (n === 3) break;
+    sonido.error();
+    const c2 = tarjeta(`
+      ${voz("amaru", `Con <code>range(${n})</code> la runa se repite <b>${n} ${n === 1 ? "vez" : "veces"}</b>: i vale ${Array.from({ length: n }, (_, i) => i).join(" y ")}. ¡Faltan piedras por pisar!`)}
+      <button class="boton-oro" id="seguir">↺ Intentar otra vez</button>`);
+    await esperarBoton(c2, "#seguir");
+  }
+  // ¡Las tres piedras! La puerta se abre
+  sonido.reparar();
+  sacudida.disparar(0.6);
+  selva.control.abrirPuerta(true);
+  estallido(escena, PUERTA.add(new Vector3(0, 2.5, 0)), ["#b388ff", "#ffd166", "#ffffff"], 140, 8);
+  desbloquear("ecos");
+  ganarKallpa(10);
+  let c = tarjeta(`
+    ${voz("amaru", "¡Tres ecos, tres piedras! Así funciona <code>for</code>.")}
+    ${teoria("<code>for</code> repite el código de adentro. <code>range(3)</code> entrega <b>0, 1, 2</b>: ¡Python empieza a contar desde 0! Por eso <code>rumi[0]</code> es la primera piedra.")}
+    <button class="boton-oro" id="seguir">Siguiente ▸</button>`);
+  await esperarBoton(c, "#seguir");
+  c = tarjeta(`
+    ${voz("amaru", "Pregunta de guardiana: ¿qué valores toma <code>i</code>?")}
+    <pre class="codigo-mini">for i in range(3):
+    print(i)</pre>
+    <div class="prologo-opciones"></div>
+    <p class="prologo-nota" hidden></p>`);
+  await elegir(c, [
+    { codigo: "1, 2, 3", ok: false, porque: "Casi. range() empieza en 0, no en 1." },
+    { codigo: "0, 1, 2", ok: true, porque: "¡Exacto! Tres valores, empezando en 0." },
+    { codigo: "3", ok: false, porque: "3 es cuántas veces se repite, pero i cambia en cada vuelta: 0, 1, 2." },
+  ]);
+  cerrarTarjeta();
+  await abrirBloques(BLOQUES_2);
+  ganarKallpa(5);
+  guardarEcos();
+  avanzar("forja");
+  await hablar(ECOS_LISTOS);
+  jefe.aparecer(new Vector3(0, 0, 9));
+  sacudida.disparar(0.8);
+  sonido.pututu();
+}
+
+async function forjarRayo(): Promise<boolean> {
+  const ok = await abrirTaller(RETO_RAYO);
+  if (!ok) {
+    aviso("Toca 📜 TALLER cuando estés listo para forjar tu rayo.", 3500);
+    return false;
+  }
+  desbloquear("forja");
+  ganarKallpa(10);
+  chaski.festejar();
+  avanzar("batalla");
+  await hablar(ANTES_BATALLA);
+  return true;
+}
+
+const batalla = new Batalla({
+  escena,
+  jefe,
+  jugador: () => chaski.raiz.position,
+  animar: (a) => (a === "lanzar" ? chaski.lanzar() : chaski.golpeado()),
+  escudo: (a) => escudo.setEnabled(a),
+  festejar: () => chaski.festejar(),
+  sacudida,
+  ecos: async (n) => {
+    const p = chaski.raiz.position;
+    const destinos = Array.from({ length: n }, (_, i) => p.add(new Vector3(Math.sin((i / n) * Math.PI * 2) * 2.2, 0, Math.cos((i / n) * Math.PI * 2) * 2.2)));
+    await lanzarEcos(destinos, false);
+    return destinos;
+  },
+  aviso,
+});
+
+function empezarBatalla() {
+  actualizarBotones();
+  aviso("¡Usa tus cartas Q, W, E! Esquiva el suelo rojo.", 3500);
+  batalla.iniciar().then(() =>
+    enCalma(async () => {
+      desbloquear("jefe");
+      ganarKallpa(25);
+      avanzar("victoria");
+      await hablar([{ quien: "tuki", texto: "¡KRAAA! ¡Lo [[atipay]]! ¡Lo venciste, {nombre}! Habla con Amaru." }]);
+    })
+  );
+}
+
+async function hablarConAmaru() {
+  await enCalma(async () => {
+    switch (estado.paso) {
+      case "selva":
+        await hablar(AMARU_1);
+        avanzar("ecos");
+        await rompecabezasEcos();
+        await forjarRayo();
+        break;
+      case "ecos":
+        await rompecabezasEcos();
+        await forjarRayo();
+        break;
+      case "forja":
+        await forjarRayo();
+        break;
+      case "victoria":
+        await hablar(VICTORIA);
+        estado.nivel = Math.max(estado.nivel, 3);
+        avanzar("completo2");
+        desbloquear("episodio2");
+        await nuevoNivel(APRENDIDO_2);
+        await proximamente(3);
+        break;
+      default:
+        await hablar([{ quien: "amaru", texto: "El río siempre encuentra un camino, {nombre}. Tú también." }]);
+    }
+  });
+  if ((estado.paso as Paso) === "batalla" && !batalla.activa) empezarBatalla();
+}
+
 async function usarTaller() {
-  const ok = await abrirTaller();
+  if (region === "selva") {
+    if (estado.paso === "forja") {
+      await forjarRayo();
+      if ((estado.paso as Paso) === "batalla" && !batalla.activa) window.setTimeout(empezarBatalla, 50);
+    } else await abrirTaller(RETO_RAYO);
+    return;
+  }
+  const ok = await abrirTaller(RETO_TALLER);
   if (ok && estado.paso === "taller") {
     ganarKallpa(10);
     desbloquear("runa");
@@ -379,8 +702,8 @@ async function usarTaller() {
 // ---------------------------------------------------------------------------
 let cercaDeMama = false;
 function actualizarBotones() {
-  $("boton-hablar").hidden = !cercaDeMama || ocupado;
-  $("boton-taller").hidden = !(estado.paso === "taller" || estado.paso === "final" || estado.paso === "completo");
+  $("boton-hablar").hidden = !cercaDeMama || ocupado || batalla.activa;
+  $("boton-taller").hidden = !(["taller", "final", "completo", "forja", "batalla", "victoria", "completo2"].includes(estado.paso)) || batalla.activa;
   $("boton-accion").hidden = !yaPaso("hablar1");
   const avisar = ["hablar1", "hablar2", "final"].includes(estado.paso);
   marcador.isVisible = avisar;
@@ -440,7 +763,7 @@ window.addEventListener("keydown", (e) => {
   if ((e.target as HTMLElement).closest("textarea, input")) return;
   const k = e.key.toLowerCase();
   teclas.add(k);
-  if (!jugando || ocupado || dialogoAbierto()) return;
+  if (!jugando || ocupado || dialogoAbierto() || batalla.activa) return;
   if (k === "o") alternarOjo();
   if (k === "e" && cercaDeMama) hablarConMama();
   if (k === "t" && !$("boton-taller").hidden) enCalma(usarTaller);
@@ -495,7 +818,8 @@ escena.onBeforeRenderObservable.add(() => {
   const pos = chaski.raiz.position;
   pos.x += dx * VELOCIDAD * dt;
   pos.z += dz * VELOCIDAD * dt;
-  resolverChoques(pos, mundo.choques);
+  resolverChoques(pos, region === "selva" ? selva.choques : mundo.choques, 0.45, region === "selva" ? LIMITE_SELVA : undefined);
+  batalla.actualizar(dt);
   chaski.actualizar(dx, dz, dt);
   tuki.seguir(chaski.raiz, dt);
   mama.actualizar(dt);
@@ -503,6 +827,31 @@ escena.onBeforeRenderObservable.add(() => {
   // Cámara de cine: se acerca durante los diálogos
   const radioObjetivo = dialogoAbierto() ? radioBase * 0.72 : radioBase;
   camara.radius += (radioObjetivo - camara.radius) * Math.min(1, dt * 3);
+  // Flecha guía
+  const destino = destinoGuia();
+  const lejos = destino ? Math.hypot(destino.x - pos.x, destino.z - pos.z) : 0;
+  guia.setEnabled(!!destino && jugando && !dialogoAbierto() && lejos > 4.5);
+  if (destino) {
+    const ang = Math.atan2(destino.x - pos.x, destino.z - pos.z);
+    guia.rotation.y = ang;
+    const latido = 2.2 + Math.sin(performance.now() / 180) * 0.25;
+    guia.position.set(pos.x + Math.sin(ang) * latido, 0.12, pos.z + Math.cos(ang) * latido);
+  }
+  // Transparencia de lo que se interpone entre la cámara y Chaski
+  for (const m of transparentes) m.visibility = 1;
+  transparentes = [];
+  const desde = camara.position;
+  const hacia = pos.add(new Vector3(0, 1.2, 0)).subtract(desde);
+  const largoRayo = hacia.length();
+  const choques = escena.multiPickWithRay(new Ray(desde, hacia.normalize(), largoRayo - 0.8), (m) => TAPAN.has(m.name));
+  for (const c of choques ?? []) {
+    const m = c.pickedMesh as Mesh;
+    if (m) {
+      m.visibility = 0.28;
+      transparentes.push(m);
+    }
+  }
+
   polvo.emitRate = !ojoAbierto && Math.hypot(dx, dz) > 0.6 ? 26 : 0;
 
   // Recoger nudos dorados (solo con el Ojo abierto)
@@ -522,12 +871,12 @@ escena.onBeforeRenderObservable.add(() => {
   }
   if (estado.palabras.length >= 6) desbloquear("simi");
 
-  const cerca = jugando && Vector3.Distance(pos, MAMA_POS) < 3.8;
+  const cerca = jugando && Vector3.Distance(pos, region === "selva" ? AMARU_POS : MAMA_POS) < 3.8;
   if (cerca !== cercaDeMama) {
     cercaDeMama = cerca;
     actualizarBotones();
   }
-  if (entrada.tomarAccion() && jugando && !ocupado && !dialogoAbierto()) alternarOjo();
+  if (entrada.tomarAccion() && jugando && !ocupado && !dialogoAbierto() && !batalla.activa) alternarOjo();
   ubicarEtiquetas();
 });
 
@@ -537,11 +886,62 @@ escena.onBeforeRenderObservable.add(() => {
 function restaurarMundo() {
   valores.agua = yaPaso("fuente");
   valores.techo = yaPaso("techo") ? "rojo" : "gris";
-  valores.animo = estado.paso === "completo" ? "feliz" : "triste";
+  valores.animo = yaPaso("final") ? "feliz" : "triste";
   aplicarValores();
+  const abierta = yaPaso("ecos");
+  rumiEncendidas.fill(abierta);
+  pintarRumi();
+  selva.control.abrirPuerta(abierta);
+}
+
+const efectosPrologo = {
+  festejar: () => chaski.festejar(),
+  barra(v: number) {
+    $("barra-kallpa").hidden = v < 0;
+    if (v < 0) return;
+    $("barra-texto").textContent = `kallpa = ${v}`;
+    ($("barra-relleno") as HTMLElement).style.width = `${Math.min(100, (v / 20) * 100)}%`;
+  },
+  ataque(activo: boolean) {
+    mundo.control.bug(true);
+    mundo.control.atacar(activo ? chaski.raiz.position : null, activo ? 2.2 : 3);
+    if (activo) sacudida.disparar(0.3);
+  },
+  escudo(activo: boolean) {
+    escudo.setEnabled(activo);
+    if (activo) {
+      estallido(escena, chaski.raiz.position.add(new Vector3(0, 1.4, 0)), ["#4ff0dc", "#ffffff", "#1fa596"], 120, 8);
+      for (const g of mundo.glitches) estallido(escena, g.position, ["#b388ff", "#8b3dff", "#2a0a5e"], 15, 4);
+    }
+  },
+  golpe() {
+    sacudida.disparar(0.9);
+    document.body.classList.remove("golpe");
+    void document.body.offsetWidth;
+    document.body.classList.add("golpe");
+  },
+  chispas: () => estallido(escena, chaski.raiz.position.add(new Vector3(0, 2, 0)), ["#ffd166", "#4ff0dc", "#ffffff"], 80, 6),
+};
+
+/** Racha diaria: volver cada día da kallpa extra. */
+function revisarRacha() {
+  const hoy = new Date().toLocaleDateString("en-CA");
+  if (estado.ultimoDia === hoy) return;
+  const ayer = new Date(Date.now() - 864e5).toLocaleDateString("en-CA");
+  estado.racha = estado.ultimoDia === ayer ? estado.racha + 1 : 1;
+  estado.ultimoDia = hoy;
+  guardar();
+  if (estado.racha > 1) {
+    window.setTimeout(() => {
+      aviso(`🔥 ¡Racha de ${estado.racha} días! +${Math.min(10, estado.racha * 2)} kallpa`, 3500);
+      ganarKallpa(Math.min(10, estado.racha * 2));
+    }, 1500);
+  }
+  if (estado.racha >= 3) desbloquear("racha3");
 }
 
 async function empezar() {
+  revisarRacha();
   despertarAudio();
   iniciarMusica();
   sonido.toque();
@@ -556,6 +956,23 @@ async function empezar() {
   jugando = true;
   actualizarHud();
   actualizarBotones();
+  if (estado.paso === "prologo") {
+    await enCalma(async () => {
+      await prologo(efectosPrologo);
+      ganarKallpa(15);
+      desbloquear("prologo");
+      avanzar("intro");
+    });
+  }
+  if (enSelva()) {
+    await viajarA("selva");
+    if (estado.paso === "forja" || estado.paso === "batalla") jefe.aparecer(new Vector3(0, 0, 9));
+    if (estado.paso === "batalla") {
+      aviso("¡El Bug Ch'aqwa te espera! Prepárate…", 2500);
+      window.setTimeout(empezarBatalla, 2600);
+      return;
+    }
+  }
   if (estado.paso === "intro") {
     await enCalma(async () => {
       await hablar(INTRO);
@@ -565,6 +982,29 @@ async function empezar() {
     aviso(`¡Bienvenido de vuelta! ${document.getElementById("objetivo-texto")!.textContent}`, 3500);
   }
 }
+
+// Portada: el título se "programa" solo, para mostrar desde el segundo 0 que este mundo es código
+(function escribirPortada() {
+  const lineas = ['mundo = "Andes"', 'heroe = "Chaski"', "codigo = True", "print(heroe + \" Runes\")"];
+  const pre = $("portada-codigo");
+  let i = 0;
+  let j = 0;
+  const paso = () => {
+    if (i >= lineas.length) {
+      pre.classList.add("listo");
+      return;
+    }
+    j++;
+    const hechas = lineas.slice(0, i).join("\n");
+    pre.textContent = (hechas ? hechas + "\n" : "") + lineas[i].slice(0, j) + "▌";
+    if (j >= lineas[i].length) {
+      i++;
+      j = 0;
+      window.setTimeout(paso, 260);
+    } else window.setTimeout(paso, 38);
+  };
+  window.setTimeout(paso, 400);
+})();
 
 if (hayPartida()) {
   $("boton-jugar").textContent = "▶ CONTINUAR";
@@ -579,6 +1019,25 @@ $("boton-nueva").addEventListener("click", () => {
 });
 
 restaurarMundo();
+
+// Personajes 3D animados (KayKit, CC0). Si no cargan, quedan los personajes armados con formas.
+(async () => {
+  try {
+    const vestirChaski = async (heroe: Chaski) => {
+      const m = await crearModelo(escena, "chaski.glb", heroe.raiz, 2.7);
+      heroe.vestir(m, m.cabeza ? ponerChullo(escena, m.cabeza, 1.12) : []);
+    };
+    await vestirChaski(chaski);
+    for (const e of ecos) await vestirChaski(e);
+    const ma = await crearModelo(escena, "amaru.glb", amaru.raiz, 2.7);
+    amaru.vestir(ma, ma.cabeza ? ponerMontera(escena, ma.cabeza, 0.85) : []);
+    listarPersonajes();
+    aplicarCalidad(calidad);
+    (window as unknown as Record<string, unknown>).__modelos = true;
+  } catch (error) {
+    console.warn("No se cargaron los modelos 3D; se usan los personajes simples.", error);
+  }
+})();
 const debil = navigator.hardwareConcurrency <= 4 || window.devicePixelRatio > 2.5;
 aplicarCalidad(debil ? "medio" : "alto");
 window.addEventListener("resize", () => {
@@ -593,5 +1052,8 @@ if (new URLSearchParams(location.search).has("prueba")) {
     estado: () => ({ ...estado, x: chaski.raiz.position.x, z: chaski.raiz.position.z, ojo: ojoAbierto, valores: { ...valores } }),
     ir: (x: number, z: number) => chaski.raiz.position.set(x, 0, z),
     calidad: (c: Calidad) => aplicarCalidad(c),
+    jefe,
+    camara,
+    amaru,
   };
 }
