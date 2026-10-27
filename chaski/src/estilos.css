@@ -810,3 +810,11 @@ body.vertical .duelo-chaski { top: calc(max(8px, env(safe-area-inset-top)) + 96p
 .mapa-cabecera .mapa-pueblo { margin-left: auto; margin-right: 8px; white-space: nowrap; }
 .mision-tarjeta.resultado .nivel-banda { font-size: clamp(26px, 5vw, 40px) !important; padding: 4px 20px 8px; }
 @media (max-height: 460px) { .duelo-teoria { display: none; } .duelo-panel header .enfoque-titulo { font-size: 14px; } }
+.lista-misiones { display: grid; gap: 8px; }
+.fila-mision { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 12px; border: 2px solid #34407e; background: #171c44; color: #fff; text-align: left; cursor: pointer; }
+.fila-mision:hover { border-color: #ffd166; }
+.fila-mision.bloqueada { opacity: .5; cursor: default; }
+.fila-texto b { display: block; font-size: 15px; }
+.fila-texto small { color: #9fb0ff; font-size: 12px; }
+.fila-estrellas { font-size: 14px; font-weight: 800; color: #ffd166; white-space: nowrap; }
+.mision-icono.chico { width: 40px; height: 40px; font-size: 22px; }

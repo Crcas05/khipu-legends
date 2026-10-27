@@ -53,7 +53,7 @@ export const OBJETIVOS: Record<string, string> = {
   hablar2: "Vuelve con Mama Khipu",
   taller: "Escribe tu primera runa en el Taller",
   final: "Habla con Mama Khipu",
-  completo: "Busca a quien tenga ❗: te encargará una misión",
+  completo: "Espera al mensajero 🦅 o toca 📜 MISIONES",
 };
 
 export const INTRO: Linea[] = [
@@ -102,7 +102,8 @@ export const BLOQUES_1: RetoBloques = {
 export const FINAL: Linea[] = [
   { quien: "mama", texto: "[[Sulpayki]], Chaski. Hoy aprendiste tu primer [[yachay]]: las variables." },
   { quien: "tuki", texto: "¡Kraa! Mira a Yaru: ¡está feliz otra vez!" },
-  { quien: "mama", texto: "Pero el Bug Ch'aqwa huyó hacia la selva. Allí te espera tu primera batalla." },
+  { quien: "mama", texto: "Pero el Bug Ch'aqwa escapó, y sus Bugs ya atacan otros lugares del Perú." },
+  { quien: "mama", texto: "Quédate atento al cielo, {nombre}: los mensajeros traerán noticias. ¡Escucha el pututo!" },
 ];
 
 /** Reparaciones con el Ojo: elegir el valor correcto de una variable. */

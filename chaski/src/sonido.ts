@@ -174,7 +174,7 @@ export const sonido = {
 // =============================================================================
 // Música por estilo: cada región tiene sus instrumentos (todo sintetizado, original)
 // =============================================================================
-export type Estilo = "andes" | "altiplano" | "selva" | "costa" | "feria" | "cumbre" | "batalla";
+export type Estilo = "andes" | "altiplano" | "selva" | "costa" | "feria" | "cumbre" | "batalla" | "misterio";
 let estilo: Estilo = "andes";
 let generacion = 0;
 let fuentesAmbiente: AudioScheduledSourceNode[] = [];
@@ -185,14 +185,15 @@ interface Receta {
   melodia: "quena" | "zampona" | "flauta" | null;
   registro: number; // desplazamiento en la escala
   ritmo: ("bombo" | "cajon" | "maraca" | "charango" | "tambor" | "-")[][]; // por compás: 8 corcheas
-  ambiente: ("viento" | "aves" | "agua" | "olas")[];
+  ambiente: ("viento" | "aves" | "agua" | "olas" | "insectos" | "ranas")[];
   pausa: [number, number]; // silencio entre frases (s)
 }
 
 const RECETAS: Record<Estilo, Receta> = {
   andes: { bpm: 84, bordon: 110, melodia: "quena", registro: 0, ritmo: [["charango", "-", "-", "charango", "-", "charango", "-", "-"]], ambiente: ["viento"], pausa: [1.5, 3] },
   altiplano: { bpm: 96, bordon: 98, melodia: "zampona", registro: -1, ritmo: [["bombo", "-", "charango", "charango", "bombo", "-", "charango", "-"]], ambiente: ["viento", "agua"], pausa: [1, 2.5] },
-  selva: { bpm: 100, bordon: null, melodia: "flauta", registro: 1, ritmo: [["tambor", "-", "maraca", "-", "tambor", "tambor", "maraca", "-"]], ambiente: ["aves", "agua"], pausa: [2, 4] },
+  selva: { bpm: 100, bordon: null, melodia: "flauta", registro: 1, ritmo: [["tambor", "-", "maraca", "-", "tambor", "tambor", "maraca", "-"]], ambiente: ["aves", "agua", "insectos", "ranas"], pausa: [2, 4] },
+  misterio: { bpm: 66, bordon: 61.7, melodia: "flauta", registro: -1, ritmo: [["tambor", "-", "-", "-", "-", "-", "maraca", "-"], ["-", "-", "-", "-", "tambor", "-", "-", "-"]], ambiente: ["insectos", "ranas", "agua"], pausa: [3, 6] },
   costa: { bpm: 88, bordon: 82, melodia: "quena", registro: -1, ritmo: [["cajon", "-", "-", "maraca", "cajon", "-", "maraca", "-"]], ambiente: ["olas", "viento"], pausa: [2, 4] },
   feria: { bpm: 112, bordon: 110, melodia: "quena", registro: 1, ritmo: [["cajon", "-", "maraca", "cajon", "-", "cajon", "maraca", "-"], ["cajon", "-", "maraca", "-", "cajon", "cajon", "maraca", "cajon"]], ambiente: [], pausa: [0.8, 2] },
   cumbre: { bpm: 72, bordon: 73.4, melodia: "quena", registro: 2, ritmo: [["bombo", "-", "-", "-", "charango", "-", "-", "-"]], ambiente: ["viento", "aves"], pausa: [2, 3.5] },
@@ -291,6 +292,28 @@ function ambiente(tipos: Receta["ambiente"]) {
   }
   fuentesAmbiente = [];
   for (const tipo of tipos) {
+    if (tipo === "insectos") {
+      // Chicharras y grillos de la noche amazónica: ruido agudo que vibra
+      const n = c.createBufferSource();
+      n.buffer = ruidoBuffer(c, 4);
+      n.loop = true;
+      const f = c.createBiquadFilter();
+      f.type = "bandpass";
+      f.frequency.value = 5200;
+      f.Q.value = 9;
+      const g = c.createGain();
+      g.gain.value = 0.03;
+      const lfo = c.createOscillator();
+      lfo.frequency.value = 17;
+      const lg = c.createGain();
+      lg.gain.value = 0.025;
+      lfo.connect(lg).connect(g.gain);
+      n.connect(f).connect(g).connect(musica);
+      n.start();
+      lfo.start();
+      fuentesAmbiente.push(n, lfo);
+      continue;
+    }
     if (tipo === "viento" || tipo === "agua" || tipo === "olas") {
       const n = c.createBufferSource();
       n.buffer = ruidoBuffer(c, 4);
@@ -313,6 +336,40 @@ function ambiente(tipos: Receta["ambiente"]) {
     }
   }
 }
+
+/** Croar de rana (selva). */
+function croar() {
+  const c = ctx;
+  if (!c || !musica) return;
+  const t = c.currentTime;
+  const base = 180 + Math.random() * 160;
+  for (let i = 0; i < 2 + Math.floor(Math.random() * 2); i++) {
+    const o = c.createOscillator();
+    o.type = "square";
+    const f = c.createBiquadFilter();
+    f.type = "lowpass";
+    f.frequency.value = 900;
+    const g = c.createGain();
+    const ti = t + i * 0.22;
+    o.frequency.setValueAtTime(base, ti);
+    o.frequency.exponentialRampToValueAtTime(base * 0.7, ti + 0.12);
+    g.gain.setValueAtTime(0.0001, ti);
+    g.gain.exponentialRampToValueAtTime(0.06, ti + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, ti + 0.15);
+    o.connect(f).connect(g).connect(musica);
+    o.start(ti);
+    o.stop(ti + 0.17);
+  }
+}
+
+/** Motivos originales (índices de la escala pentatónica) para que la música tenga frases reconocibles. */
+const MOTIVOS: Partial<Record<Estilo, number[][]>> = {
+  andes: [[4, 5, 6, 5, 4, 3, 4], [6, 7, 6, 5, 4, 4], [3, 4, 5, 6, 5, 3, 4]],
+  altiplano: [[3, 3, 4, 5, 4, 3, 2, 3], [5, 6, 5, 4, 3, 3]],
+  selva: [[6, 7, 8, 7, 6, 5], [5, 6, 5, 7, 6, 5]],
+  misterio: [[3, 2, 3, 5, 3], [4, 3, 2, 1], [2, 3, 2]],
+  batalla: [[7, 7, 8, 7, 6, 7], [6, 7, 8, 9, 8, 7]],
+};
 
 function cantarAve() {
   const c = ctx;
@@ -381,9 +438,11 @@ export function iniciarMusica(nuevo?: Estilo) {
   const tocarFrase = () => {
     if (gen !== generacion) return;
     let t = 0;
-    const notas = 4 + Math.floor(Math.random() * 4);
+    const motivos = MOTIVOS[estilo];
+    const motivo = motivos && Math.random() < 0.55 ? motivos[Math.floor(Math.random() * motivos.length)] : null;
+    const notas = motivo ? motivo.length : 4 + Math.floor(Math.random() * 4);
     for (let i = 0; i < notas && r.melodia; i++) {
-      paso = Math.max(0, Math.min(ESCALA.length - 1, paso + [-2, -1, -1, 1, 1, 2][Math.floor(Math.random() * 6)]));
+      paso = motivo ? Math.max(0, Math.min(ESCALA.length - 1, motivo[i])) : Math.max(0, Math.min(ESCALA.length - 1, paso + [-2, -1, -1, 1, 1, 2][Math.floor(Math.random() * 6)]));
       const dur = (estilo === "batalla" ? [0.5, 0.5, 1] : [1, 1, 2, 3])[Math.floor(Math.random() * (estilo === "batalla" ? 3 : 4))] * corchea;
       if (r.melodia === "zampona") zampona(ESCALA[paso], t, dur * 0.95);
       else quena(ESCALA[paso] * (r.melodia === "flauta" ? 2 : 1), t, dur * 0.95, r.melodia === "flauta" ? 0.32 : 0.5, musica!);
@@ -391,6 +450,7 @@ export function iniciarMusica(nuevo?: Estilo) {
     }
     if (paso > 7 + Math.max(0, r.registro)) paso = 4 + r.registro;
     if (r.ambiente.includes("aves") && Math.random() < 0.6) window.setTimeout(cantarAve, Math.random() * 2000);
+    if (r.ambiente.includes("ranas") && Math.random() < 0.7) window.setTimeout(croar, Math.random() * 2500);
     window.setTimeout(tocarFrase, (t + r.pausa[0] + Math.random() * (r.pausa[1] - r.pausa[0])) * 1000);
   };
   window.setTimeout(tocarFrase, 900);

@@ -9,7 +9,8 @@ import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTextur
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { material } from "./personajes";
-import { texturaPasto, texturaAdobe, texturaTejas, texturaPiedraInca } from "./texturas";
+import { texturaPasto, texturaAdobe, texturaTejas, texturaPiedraInca, texturaIchu } from "./texturas";
+import { crearTerreno, crearPastizal, alturaTerreno, aguaViva, type OpcionesTerreno } from "./terreno";
 import type { Colocacion } from "./paisaje";
 
 function conTextura(escena: Scene, nombre: string, tex: StandardMaterial["diffuseTexture"], color = "#ffffff") {
@@ -48,8 +49,17 @@ export function crearMundo(escena: Scene) {
   const agrega = <T extends Mesh>(m: T) => (mallas.push(m), m);
 
   // Suelo de pasto y plaza de piedra
-  const pasto = agrega(MeshBuilder.CreateGround("pasto", { width: 140, height: 140 }, escena));
-  pasto.material = conTextura(escena, "m-pasto", texturaPasto(escena, "#5c9a43", 22));
+  // Valle con relieve: plano donde se juega y cerros con ichu dorado alrededor
+  const OPC: OpcionesTerreno = {
+    tamano: 300,
+    plano: 32,
+    alto: 22,
+    material: conTextura(escena, "m-pasto", texturaPasto(escena, "#5c9a43", 48)),
+    ladera: conTextura(escena, "m-ladera", texturaIchu(escena, 30), "#e8d9a8"),
+  };
+  const [pasto, ladera] = crearTerreno(escena, "pasto", OPC);
+  mallas.push(pasto, ladera);
+  const sobre = (x: number, z: number) => alturaTerreno(OPC, x, z);
   const paisaje: Colocacion[] = [];
   const plaza = agrega(MeshBuilder.CreateDisc("plaza", { radius: 10, tessellation: 40 }, escena));
   plaza.rotation.x = Math.PI / 2;
@@ -77,6 +87,7 @@ export function crearMundo(escena: Scene) {
   const agua = agrega(MeshBuilder.CreateCylinder("agua", { height: 0.1, diameter: 3.6, tessellation: 24 }, escena));
   agua.position.y = 0.74;
   agua.material = material(escena, "#3fa7d6", 0.6);
+  aguaViva(escena, agua.material as StandardMaterial, 2);
   const columna = agrega(MeshBuilder.CreateCylinder("columna", { height: 1.8, diameter: 0.6, tessellation: 12 }, escena));
   columna.position.y = 1.4;
   columna.material = material(escena, "#9c8b78");
@@ -129,13 +140,13 @@ export function crearMundo(escena: Scene) {
   // Montañas (apus) con nieve
   for (let i = 0; i < 14; i++) {
     const angulo = (i / 14) * Math.PI * 2 + 0.2;
-    const distancia = 92 + azar(i) * 16;
-    const alto = 38 + azar(i + 7) * 26;
+    const distancia = 120 + azar(i) * 18;
+    const alto = 46 + azar(i + 7) * 30;
     const monte = agrega(MeshBuilder.CreateCylinder("apu", { height: alto, diameterTop: 0, diameterBottom: alto * 1.5, tessellation: 7 }, escena));
-    monte.position.set(Math.sin(angulo) * distancia, alto / 2 - 1, Math.cos(angulo) * distancia);
+    monte.position.set(Math.sin(angulo) * distancia, alto / 2 - 1 + 10, Math.cos(angulo) * distancia);
     monte.material = material(escena, i % 2 ? "#6f8f5a" : "#7c8f6a");
     const nieve = agrega(MeshBuilder.CreateCylinder("nieve", { height: alto * 0.25, diameterTop: 0, diameterBottom: alto * 0.38, tessellation: 7 }, escena));
-    nieve.position.set(monte.position.x, alto - 1 - alto * 0.125 + 0.05, monte.position.z);
+    nieve.position.set(monte.position.x, alto - 1 + 10 - alto * 0.125 + 0.05, monte.position.z);
     nieve.material = material(escena, "#f4f7fb");
   }
 
@@ -165,25 +176,38 @@ export function crearMundo(escena: Scene) {
     const x = Math.sin(a) * d;
     const z = Math.cos(a) * d;
     if (z > 24 && Math.abs(x) < 22) continue; // los andenes del fondo quedan libres
-    paisaje.push({ modelo: ["hills_A_trees", "hills_B_trees", "hills_C_trees"][i % 3], x, z, escala: 6.5 + azar(i) * 2.5, giro: azar(i * 7) * 6.28 });
+    if (z < -12 && Math.abs(x) < 30) continue; // detrás de la cámara: no tapar la vista
+    paisaje.push({ modelo: ["hills_A_trees", "hills_B_trees", "hills_C_trees"][i % 3], x, z, y: sobre(x, z) - 0.3, escala: 6.5 + azar(i) * 2.5, giro: azar(i * 7) * 6.28 });
   }
   // Bosquecitos entre las casas y el borde
   for (let i = 0; i < 14; i++) {
     const a = (i / 14) * Math.PI * 2 + 0.3;
     const d = 26 + azar(i * 9.7) * 3;
-    paisaje.push({ modelo: i % 2 ? "trees_A_medium" : "trees_B_medium", x: Math.sin(a) * d, z: Math.cos(a) * d, escala: 3.6, giro: azar(i) * 6.28 });
+    if (Math.cos(a) * d < -12 && Math.abs(Math.sin(a) * d) < 26) continue;
+    paisaje.push({ modelo: i % 2 ? "trees_A_medium" : "trees_B_medium", x: Math.sin(a) * d, z: Math.cos(a) * d, y: sobre(Math.sin(a) * d, Math.cos(a) * d) - 0.2, escala: 3.6, giro: azar(i) * 6.28 });
   }
   // Montañas verdes con árboles (cerros cercanos) y rocas grandes
   for (let i = 0; i < 16; i++) {
     const a = (i / 16) * Math.PI * 2 + azar(i * 2.2) * 0.25;
     const d = 54 + azar(i * 3.9) * 14;
-    paisaje.push({ modelo: ["mountain_A_grass_trees", "mountain_B_grass_trees", "mountain_C_grass_trees"][i % 3], x: Math.sin(a) * d, z: Math.cos(a) * d, escala: 13 + azar(i) * 5, alto: 1.2 + azar(i * 5) * 0.5, giro: azar(i * 8) * 6.28 });
+    const mx = Math.sin(a) * d;
+    const mz = Math.cos(a) * d;
+    paisaje.push({ modelo: ["mountain_A_grass_trees", "mountain_B_grass_trees", "mountain_C_grass_trees"][i % 3], x: mx, z: mz, y: sobre(mx, mz) - 2, escala: 13 + azar(i) * 5, alto: 1.2 + azar(i * 5) * 0.5, giro: azar(i * 8) * 6.28 });
   }
   for (let i = 0; i < 10; i++) {
     const a = azar(i * 13.1) * Math.PI * 2;
     const d = 27 + azar(i * 2.7) * 6;
-    paisaje.push({ modelo: "resource_stone", x: Math.sin(a) * d, z: Math.cos(a) * d, escala: 5, giro: azar(i) * 6.28 });
+    paisaje.push({ modelo: "resource_stone", x: Math.sin(a) * d, z: Math.cos(a) * d, y: sobre(Math.sin(a) * d, Math.cos(a) * d) - 0.1, escala: 5, giro: azar(i) * 6.28 });
   }
+  // Matas de pasto e ichu (miles, muy livianas para el celular)
+  const libre = (x: number, z: number) => {
+    const r = Math.hypot(x, z);
+    if (r < 11.5) return false; // plaza
+    if (Math.abs(x) < 2.6 || Math.abs(z) < 2.6) return false; // caminos
+    return !choques.some((c) => Math.hypot(c.x - x, c.z - z) < c.r + 0.4);
+  };
+  mallas.push(crearPastizal(escena, "matas", OPC, 1700, ["#8cc95c", "#5a9a3a"], libre, 46));
+  mallas.push(crearPastizal(escena, "ichu-matas", { ...OPC }, 1400, ["#d9bf74", "#a88a3e"], (x, z) => Math.hypot(x, z) > 34, 75));
 
   // Cielo con degradado (cúpula) y nubes que pasan
   const cieloMat = new StandardMaterial("m-cielo", escena);

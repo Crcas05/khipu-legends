@@ -76,3 +76,41 @@ export function resultadoMision(m: Mision, n: number, errores: number, golpes: n
     });
   });
 }
+
+/** Lista de misiones (las abiertas se pueden jugar o repetir). */
+export function listaMisiones(lista: Mision[]): Promise<Mision | null> {
+  const c = caja();
+  const abierta = (m: Mision) => m.numero === 1 || !!estado.misiones[lista.find((x) => x.numero === m.numero - 1)?.id ?? ""];
+  c.innerHTML = `
+    <div class="mision-tarjeta">
+      <div class="mision-cabeza"><span class="mision-icono">📜</span><div><small>EL VIAJE DEL CHASKI</small><h2>Misiones</h2></div></div>
+      <div class="lista-misiones">
+        ${lista
+          .map((m) => {
+            const ok = abierta(m);
+            const n = estado.misiones[m.id] ?? 0;
+            return `<button class="fila-mision ${ok ? "" : "bloqueada"}" data-id="${m.id}" ${ok ? "" : "disabled"}>
+              <span class="mision-icono chico">${ok ? m.icono : "🔒"}</span>
+              <span class="fila-texto"><b>${m.numero}. ${m.nombre}</b><small>${m.lugar} · ${m.aprendes}</small></span>
+              <span class="fila-estrellas">${n ? estrellas(n) : ok ? "¡Nueva!" : ""}</span>
+            </button>`;
+          })
+          .join("")}
+      </div>
+      <div class="mision-botones"><button class="boton-secundario" id="mision-cerrar">Cerrar</button></div>
+    </div>`;
+  c.hidden = false;
+  return new Promise((r) => {
+    c.querySelectorAll<HTMLButtonElement>(".fila-mision:not(.bloqueada)").forEach((b) =>
+      b.addEventListener("click", () => {
+        sonido.toque();
+        c.hidden = true;
+        r(lista.find((m) => m.id === b.dataset.id) ?? null);
+      })
+    );
+    c.querySelector("#mision-cerrar")!.addEventListener("click", () => {
+      c.hidden = true;
+      r(null);
+    });
+  });
+}

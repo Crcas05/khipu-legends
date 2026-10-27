@@ -19,7 +19,8 @@ import { Chaski } from "./heroes";
 import { crearLlama, material } from "./personajes";
 import { crearModelo } from "./modelos";
 import { poblar, type Colocacion } from "./paisaje";
-import { texturaPiedraInca, texturaIchu, texturaHojarasca } from "./texturas";
+import { texturaPiedraInca, texturaIchu, texturaHojarasca, texturaPasto } from "./texturas";
+import { crearTerreno, crearPastizal, type OpcionesTerreno } from "./terreno";
 import { duelo, type Accion, type ResultadoDuelo } from "./ui/duelo";
 
 export const LIMITE_MISION = 21;
@@ -56,6 +57,15 @@ interface Item {
   malla: Mesh;
   tomado: boolean;
 }
+interface Jaula {
+  raiz: TransformNode;
+  animal: TransformNode;
+  nombre: string;
+  vida: number;
+  libre: boolean;
+  huida: number;
+  dir: number;
+}
 interface Ilusion {
   raiz: TransformNode;
   dicho: boolean;
@@ -79,6 +89,9 @@ export class MisionJuego {
   private items: Item[] = [];
   private vicunas: Vicuna[] = [];
   private ilusiones: Ilusion[] = [];
+  private jaulas: Jaula[] = [];
+  private apariciones = 0;
+  private chullaVisible = 0;
   private oleada = 0;
   progreso = 0;
   private tiempo = 0;
@@ -128,7 +141,7 @@ export class MisionJuego {
     if (m.ambiente === "templo") await this.armarTemplo();
     else if (m.ambiente === "puna") await this.armarPuna();
     else await this.armarSelva();
-    cambiarMusica(m.ambiente === "templo" ? "andes" : m.ambiente === "puna" ? "altiplano" : "selva");
+    cambiarMusica(m.ambiente === "templo" ? "andes" : m.ambiente === "puna" ? "altiplano" : "misterio");
     this.pintarObjetivo();
   }
 
@@ -137,6 +150,10 @@ export class MisionJuego {
     for (const v of this.vicunas) v.raiz.dispose();
     for (const i of this.items) i.malla.dispose();
     for (const i of this.ilusiones) i.raiz.dispose();
+    for (const j of this.jaulas) j.raiz.dispose();
+    this.jaulas = [];
+    this.apariciones = 0;
+    this.chullaVisible = 0;
     this.bugs = [];
     this.vicunas = [];
     this.items = [];
@@ -175,9 +192,14 @@ export class MisionJuego {
   // ---------------------------------------------------------------------------
   private async armarTemplo() {
     const e = this.c.escena;
-    const piso = this.malla(MeshBuilder.CreateGround("piso-templo", { width: 120, height: 120 }, e));
+    // Cerros verdes del Cusco alrededor del templo
+    const opc: OpcionesTerreno = { tamano: 260, plano: 30, alto: 26, material: textura(e, "m-pasto-cusco", texturaPasto(e, "#5c9a43", 40), "#ffffff"), ladera: textura(e, "m-ichu-cusco", texturaIchu(e, 26), "#ffffff") };
+    for (const t of crearTerreno(e, "terreno-templo", opc)) this.malla(t);
+    this.malla(crearPastizal(e, "matas-cusco", opc, 1500, ["#6fae4a", "#3f7f2f"], (x, z) => Math.max(Math.abs(x), Math.abs(z)) > 25, 70));
+    const piso = this.malla(MeshBuilder.CreateGround("piso-templo", { width: 48, height: 48 }, e));
+    piso.position.y = 0.02;
     const tPiso = texturaPiedraInca(e);
-    tPiso.uScale = tPiso.vScale = 22;
+    tPiso.uScale = tPiso.vScale = 9;
     piso.material = textura(e, "m-piso-templo", tPiso, "#e2d3b5");
     const tMuro = texturaPiedraInca(e).clone();
     tMuro.uScale = 10;
@@ -252,8 +274,12 @@ export class MisionJuego {
 
   private async armarPuna() {
     const e = this.c.escena;
-    const piso = this.malla(MeshBuilder.CreateGround("piso-puna", { width: 160, height: 160 }, e));
-    piso.material = textura(e, "m-piso-puna", texturaIchu(e, 26), "#ffffff");
+    const rocaMat = textura(e, "m-roca-puna", texturaPiedraInca(e), "#9a958a");
+    (rocaMat.diffuseTexture as StandardMaterial["diffuseTexture"] & { uScale: number; vScale: number }).uScale = 30;
+    (rocaMat.diffuseTexture as StandardMaterial["diffuseTexture"] & { uScale: number; vScale: number }).vScale = 30;
+    const opc: OpcionesTerreno = { tamano: 300, plano: 26, alto: 30, material: textura(e, "m-piso-puna", texturaIchu(e, 40), "#ffffff"), ladera: rocaMat };
+    for (const t of crearTerreno(e, "piso-puna", opc)) this.malla(t);
+    this.malla(crearPastizal(e, "ichu-puna", opc, 2400, ["#e2c97e", "#a88a3e"], (x, z) => Math.hypot(x - 13, z - 12) > 6, 60));
     const laguna = this.malla(MeshBuilder.CreateDisc("laguna", { radius: 5, tessellation: 32 }, e));
     laguna.rotation.x = Math.PI / 2;
     laguna.position.set(13, 0.03, 12);
@@ -315,8 +341,9 @@ export class MisionJuego {
 
   private async armarSelva() {
     const e = this.c.escena;
-    const piso = this.malla(MeshBuilder.CreateGround("piso-selva", { width: 140, height: 140 }, e));
-    piso.material = textura(e, "m-piso-selva", texturaHojarasca(e, 24), "#ffffff");
+    const opc: OpcionesTerreno = { tamano: 240, plano: 25, alto: 16, material: textura(e, "m-piso-selva", texturaHojarasca(e, 40), "#ffffff"), ladera: textura(e, "m-ladera-ucayali", texturaPasto(e, "#2d5f27", 26), "#ffffff") };
+    for (const t of crearTerreno(e, "piso-selva", opc)) this.malla(t);
+    this.malla(crearPastizal(e, "helechos-ucayali", opc, 1600, ["#4caf50", "#1f5e2a"], (x, z) => Math.hypot(x, z - 6) > 4 && Math.hypot(x - INICIO_MISION.x, z - INICIO_MISION.z) > 3, 30));
     // Selva amazónica: árboles de hoja ancha (tronco alto y copa ancha), helechos y lianas
     const troncoMat = material(e, "#6e5a44");
     const hojas = [material(e, "#2f6a2c"), material(e, "#3c7d34"), material(e, "#25552a")];
@@ -398,14 +425,13 @@ export class MisionJuego {
       l.position.set(Math.sin(i * 7) * 16, 1 + (i % 5) * 0.6, Math.cos(i * 5) * 16);
       l.material = this.semillaMat;
     }
-    // Semillas de lupuna
-    for (const [x, z] of [[-14, -6], [15, -9], [-12, 15], [14, 14]] as [number, number][]) {
-      const s = MeshBuilder.CreateSphere("semilla", { diameter: 0.6, segments: 8 }, e);
-      s.material = this.semillaMat;
-      s.position.set(x, 0.9, z);
-      s.parent = this.raiz;
-      this.items.push({ malla: s, tomado: false });
-    }
+    // Animales atrapados en jaulas de los Bugs-taladores
+    const animales: [string, number, number][] = [["otorongo", -14, -6], ["mono", 15, -9], ["perezoso", -12, 15], ["guacamayo", 14, 14]];
+    for (const [nombre, x, z] of animales) this.ponerJaula(nombre, x, z);
+    // El Chullachaqui ya ronda el bosque (aparece entre la neblina y desaparece)
+    void this.crearChulla(new Vector3(0, 0, 20)).then((ch) => {
+      if (this.chullaVisible <= 0 && !this.enDuelo) ch.raiz.setEnabled(false);
+    });
     // Ilusiones: voces que imitan a tus amigos (si las sigues, te pierdes)
     for (const [x, z] of [[-18, 4], [18, 3], [2, 19]] as [number, number][]) {
       const r = new TransformNode("ilusion", e);
@@ -432,6 +458,163 @@ export class MisionJuego {
         if (m.material === this.bugMat) m.material = material(this.c.escena, "#1e2a24", 0.2);
       });
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Selva: animales en jaulas y el Chullachaqui
+  // ---------------------------------------------------------------------------
+  private armarAnimal(nombre: string): TransformNode {
+    const e = this.c.escena;
+    const r = new TransformNode(`animal-${nombre}`, e);
+    const p = (mesh: Mesh, color: string, x: number, y: number, z: number) => {
+      mesh.material = material(e, color);
+      mesh.parent = r;
+      mesh.position.set(x, y, z);
+      return mesh;
+    };
+    if (nombre === "otorongo") {
+      const c = p(MeshBuilder.CreateSphere("otorongo", { diameter: 1 }, e), "#d9a23a", 0, 0.6, 0);
+      c.scaling.set(0.7, 0.6, 1.4);
+      p(MeshBuilder.CreateSphere("otorongo-cabeza", { diameter: 0.6 }, e), "#d9a23a", 0, 0.85, 0.75);
+      for (let i = 0; i < 10; i++) p(MeshBuilder.CreateSphere("mancha", { diameter: 0.14 }, e), "#2a1a0a", Math.sin(i * 2) * 0.32, 0.6 + Math.cos(i * 3) * 0.22, -0.5 + i * 0.1);
+      for (const l of [-1, 1]) for (const f of [-1, 1]) p(MeshBuilder.CreateCylinder("pata", { height: 0.5, diameter: 0.16 }, e), "#c98f2a", 0.22 * l, 0.25, 0.45 * f);
+      p(MeshBuilder.CreateCylinder("cola", { height: 0.9, diameter: 0.1 }, e), "#d9a23a", 0, 0.7, -0.95).rotation.x = 1.1;
+    } else if (nombre === "mono") {
+      p(MeshBuilder.CreateSphere("mono", { diameter: 0.8 }, e), "#5a3a22", 0, 0.7, 0);
+      p(MeshBuilder.CreateSphere("mono-cabeza", { diameter: 0.55 }, e), "#5a3a22", 0, 1.25, 0.05);
+      p(MeshBuilder.CreateSphere("mono-cara", { diameter: 0.38 }, e), "#d9b48a", 0, 1.22, 0.2);
+      for (const l of [-1, 1]) p(MeshBuilder.CreateCylinder("brazo", { height: 0.7, diameter: 0.12 }, e), "#5a3a22", 0.42 * l, 0.75, 0).rotation.z = 0.5 * l;
+      p(MeshBuilder.CreateTorus("cola-mono", { diameter: 0.7, thickness: 0.08 }, e), "#5a3a22", 0, 0.6, -0.5).rotation.x = Math.PI / 2;
+    } else if (nombre === "perezoso") {
+      const c = p(MeshBuilder.CreateSphere("perezoso", { diameter: 1 }, e), "#8b7b62", 0, 0.65, 0);
+      c.scaling.set(0.75, 0.85, 0.7);
+      p(MeshBuilder.CreateSphere("perezoso-cara", { diameter: 0.5 }, e), "#d9c9a8", 0, 1.05, 0.25);
+      for (const l of [-1, 1]) p(MeshBuilder.CreateSphere("antifaz", { diameter: 0.14 }, e), "#2a2a2a", 0.1 * l, 1.1, 0.46);
+      for (const l of [-1, 1]) p(MeshBuilder.CreateCylinder("brazo-largo", { height: 0.9, diameter: 0.14 }, e), "#8b7b62", 0.45 * l, 0.75, 0.1).rotation.z = 0.9 * l;
+    } else {
+      const c = p(MeshBuilder.CreateSphere("guacamayo", { diameter: 0.6 }, e), "#d7262e", 0, 0.9, 0);
+      c.scaling.set(0.7, 1, 0.8);
+      p(MeshBuilder.CreateSphere("guacamayo-cabeza", { diameter: 0.38 }, e), "#d7262e", 0, 1.3, 0.05);
+      p(MeshBuilder.CreateCylinder("pico", { height: 0.2, diameterTop: 0, diameterBottom: 0.14 }, e), "#2a2a2a", 0, 1.27, 0.25).rotation.x = Math.PI / 2;
+      for (const l of [-1, 1]) {
+        const a = p(MeshBuilder.CreateBox("ala-g", { width: 0.1, height: 0.5, depth: 0.4 }, e), "#1f6fd1", 0.3 * l, 0.9, 0);
+        a.rotation.z = 0.2 * l;
+      }
+      p(MeshBuilder.CreateBox("cola-g", { width: 0.12, height: 0.8, depth: 0.08 }, e), "#f5c518", 0, 0.5, -0.25).rotation.x = -0.4;
+      const percha = p(MeshBuilder.CreateCylinder("percha", { height: 0.6, diameter: 0.08 }, e), "#6b4a2a", 0, 0.62, 0);
+      percha.rotation.z = Math.PI / 2;
+    }
+    return r;
+  }
+
+  private ponerJaula(nombre: string, x: number, z: number) {
+    const e = this.c.escena;
+    const raiz = new TransformNode(`jaula-${nombre}`, e);
+    raiz.parent = this.raiz;
+    raiz.position.set(x, 0, z);
+    const animal = this.armarAnimal(nombre);
+    animal.parent = raiz;
+    const barra = material(e, "#4a3a5a", 0.3);
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2;
+      const b = MeshBuilder.CreateCylinder("barra-jaula", { height: 2.2, diameter: 0.09, tessellation: 6 }, e);
+      b.material = barra;
+      b.parent = raiz;
+      b.position.set(Math.sin(a) * 1.1, 1.1, Math.cos(a) * 1.1);
+    }
+    const tapa = MeshBuilder.CreateCylinder("tapa-jaula", { height: 0.15, diameter: 2.4, tessellation: 10 }, e);
+    tapa.material = barra;
+    tapa.parent = raiz;
+    tapa.position.y = 2.25;
+    const sello = MeshBuilder.CreateBox("sello-bug", { size: 0.5 }, e);
+    sello.material = this.bugMat;
+    sello.parent = raiz;
+    sello.position.y = 2.6;
+    this.choques.push({ x, z, r: 1.3 });
+    this.jaulas.push({ raiz, animal, nombre, vida: 3, libre: false, huida: 0, dir: Math.atan2(x, z) });
+  }
+
+  private golpearJaula(j: Jaula) {
+    if (j.libre) return;
+    j.vida--;
+    estallido(this.c.escena, j.raiz.position.add(new Vector3(0, 1.6, 0)), ["#b388ff", "#ffffff"], 30, 4);
+    sonido.kallpa();
+    if (j.vida > 0) {
+      this.c.aviso(`🔓 ¡La jaula cruje! ${j.vida} golpe${j.vida > 1 ? "s" : ""} más.`, 1200);
+      return;
+    }
+    j.libre = true;
+    // Se rompen las barras y el animal escapa feliz hacia el bosque
+    for (const hijo of j.raiz.getChildMeshes(true)) if (hijo.name !== "") hijo.dispose();
+    j.animal.parent = this.raiz;
+    j.animal.position.copyFrom(j.raiz.position);
+    const ch = this.choques.find((c) => c.x === j.raiz.position.x && c.z === j.raiz.position.z);
+    if (ch) this.choques.splice(this.choques.indexOf(ch), 1);
+    estallido(this.c.escena, j.raiz.position.add(new Vector3(0, 1.5, 0)), ["#7dffb0", "#ffd166", "#ffffff"], 90, 7);
+    sonido.tesoro();
+    this.c.chaski.festejar();
+    this.progreso++;
+    const nombres: Record<string, string> = { otorongo: "¡el otorongo!", mono: "¡el mono!", perezoso: "¡el perezoso!", guacamayo: "¡el guacamayo!" };
+    this.c.aviso(`🐾 Liberaste a ${nombres[j.nombre] ?? j.nombre} ${this.progreso}/${this.mision!.exploracion.total}`, 2200);
+    this.pintarObjetivo();
+    if (this.progreso === 2) void this.aparecerChulla("¿Liberas a mis animales, chaski? Je, je… Veremos si respetas mi bosque.");
+    if (this.progreso >= this.mision!.exploracion.total) this.listoParaJefe();
+  }
+
+  /** Crea (una vez) al Chullachaqui: hombrecito de sombrero de paja, verde del monte. */
+  private async crearChulla(donde: Vector3): Promise<Chaski> {
+    if (this.chulla) {
+      this.chulla.raiz.position.copyFrom(donde);
+      return this.chulla;
+    }
+    const e = this.c.escena;
+    const ch = new Chaski(e, true);
+    ch.raiz.parent = this.raiz;
+    ch.raiz.position.copyFrom(donde);
+    ch.raiz.rotation.y = Math.PI;
+    this.chulla = ch;
+    try {
+      const mod = await crearModelo(e, "killa.glb", ch.raiz, 2.2);
+      ch.vestir(mod);
+      for (const malla of mod.mallas) {
+        if (malla.material instanceof StandardMaterial) {
+          const verde = malla.material.clone(`${malla.material.name}-chulla`);
+          verde.diffuseColor = new Color3(0.55, 0.85, 0.5);
+          malla.material = verde;
+        }
+      }
+      if (mod.cabeza) {
+        const paja = material(e, "#c9a55a");
+        const ala = MeshBuilder.CreateCylinder("sombrero-ala", { height: 0.06, diameter: 1.5, tessellation: 20 }, e);
+        ala.material = paja;
+        ala.parent = mod.cabeza;
+        ala.position.y = 0.72;
+        const copa = MeshBuilder.CreateCylinder("sombrero-copa", { height: 0.4, diameterTop: 0.55, diameterBottom: 0.7, tessellation: 16 }, e);
+        copa.material = paja;
+        copa.parent = mod.cabeza;
+        copa.position.y = 0.92;
+      }
+    } catch {
+      /* sin modelo: queda el personaje de formas */
+    }
+    return ch;
+  }
+
+  /** Aparición con suspenso: entre los árboles, dice algo y se desvanece en la neblina. */
+  private async aparecerChulla(frase: string) {
+    if (!this.mision || this.fase !== "explorar") return;
+    this.apariciones++;
+    const p = this.c.jugador();
+    const a = Math.atan2(p.x, p.z) + (this.apariciones % 2 ? 0.8 : -0.8);
+    const donde = new Vector3(Math.sin(a) * 15, 0, Math.cos(a) * 15);
+    const ch = await this.crearChulla(donde);
+    ch.raiz.setEnabled(true);
+    ch.raiz.rotation.y = Math.atan2(p.x - donde.x, p.z - donde.z);
+    estallido(this.c.escena, donde.add(new Vector3(0, 1.5, 0)), ["#bfe3ff", "#7dffb0", "#ffffff"], 60, 6);
+    sonido.ojo(true);
+    this.c.sacudida.disparar(0.3);
+    this.c.aviso(`🌳 Chullachaqui: «${frase}»`, 4200);
+    this.chullaVisible = 4;
   }
 
   // ---------------------------------------------------------------------------
@@ -471,12 +654,22 @@ export class MisionJuego {
       const d = Vector3.Distance(p, b.raiz.position);
       if (d < mejor) [mejor, objetivo] = [d, b];
     }
+    let jaula: Jaula | null = null;
+    if (!objetivo) {
+      let mj = 15;
+      for (const j of this.jaulas) {
+        if (j.libre) continue;
+        const d = Vector3.Distance(p, j.raiz.position);
+        if (d < mj) [mj, jaula] = [d, j];
+      }
+    }
     this.c.chaski.lanzar();
     sonido.toque();
     const desde = p.add(new Vector3(0, 1.6, 0));
-    const hasta = objetivo ? objetivo.raiz.position.add(new Vector3(0, 0.4, 0)) : desde.add(adelante.scale(10));
+    const hasta = objetivo ? objetivo.raiz.position.add(new Vector3(0, 0.4, 0)) : jaula ? jaula.raiz.position.add(new Vector3(0, 1.4, 0)) : desde.add(adelante.scale(10));
     this.proyectil(desde, hasta, "#fff6d6").then(() => {
       if (objetivo && objetivo.vida > 0) this.golpearBug(objetivo);
+      else if (jaula) this.golpearJaula(jaula);
     });
   }
 
@@ -620,6 +813,27 @@ export class MisionJuego {
         il.dicho = false;
       }
     }
+    // Animales liberados: saltan y corren al bosque
+    for (const j of this.jaulas) {
+      if (!j.libre || j.huida > 6) continue;
+      j.huida += dt;
+      j.animal.position.x += Math.sin(j.dir) * 4 * dt;
+      j.animal.position.z += Math.cos(j.dir) * 4 * dt;
+      j.animal.position.y = Math.abs(Math.sin(j.huida * 8)) * 0.6;
+      j.animal.rotation.y = j.dir;
+      if (j.huida > 6) j.animal.setEnabled(false);
+    }
+    // El Chullachaqui: primera aparición al entrar, y se desvanece solo
+    if (m.ambiente === "selva" && this.fase === "explorar" && !quieto) {
+      if (this.apariciones === 0 && this.tiempo > 4) void this.aparecerChulla("¿Quién entra a mi bosque? Je, je… ¡Cuidado con perderte, chaski!");
+      if (this.chullaVisible > 0) {
+        this.chullaVisible -= dt;
+        if (this.chullaVisible <= 0 && this.chulla) {
+          estallido(this.c.escena, this.chulla.raiz.position.add(new Vector3(0, 1.5, 0)), ["#bfe3ff", "#ffffff"], 50, 5);
+          this.chulla.raiz.setEnabled(false);
+        }
+      }
+    }
     // Disco del Inti (templo): brilla más con cada pieza
     if (this.disco && m.exploracion.tipo === "recoger") {
       const f = this.progreso / m.exploracion.total;
@@ -649,7 +863,7 @@ export class MisionJuego {
     const p = this.c.jugador();
     let mejor: Vector3 | null = null;
     let d = Infinity;
-    const candidatos = [...this.items.filter((i) => !i.tomado).map((i) => i.malla.position), ...this.bugs.filter((b) => b.vida > 0 && !b.lleva).map((b) => b.raiz.position), ...this.bugs.filter((b) => b.lleva).map((b) => b.raiz.position)];
+    const candidatos = [...this.jaulas.filter((j) => !j.libre).map((j) => j.raiz.position), ...this.items.filter((i) => !i.tomado).map((i) => i.malla.position), ...this.bugs.filter((b) => b.vida > 0 && !b.lleva).map((b) => b.raiz.position), ...this.bugs.filter((b) => b.lleva).map((b) => b.raiz.position)];
     for (const c of candidatos) {
       const dd = Vector3.Distance(p, c);
       if (dd < d) [d, mejor] = [dd, c];
@@ -732,35 +946,10 @@ export class MisionJuego {
         this.escudoJefe.isPickable = false;
       }
     } else {
-      const ch = new Chaski(e, true);
-      ch.raiz.parent = this.raiz;
-      ch.raiz.position.copyFrom(lugar);
+      const ch = await this.crearChulla(lugar);
+      this.chullaVisible = 0;
+      ch.raiz.setEnabled(true);
       ch.raiz.rotation.y = Math.PI;
-      try {
-        const mod = await crearModelo(e, "killa.glb", ch.raiz, 2.2);
-        ch.vestir(mod);
-        for (const malla of mod.mallas) {
-          if (malla.material instanceof StandardMaterial) {
-            const verde = malla.material.clone(`${malla.material.name}-chulla`);
-            verde.diffuseColor = new Color3(0.55, 0.85, 0.5);
-            malla.material = verde;
-          }
-        }
-        if (mod.cabeza) {
-          const paja = material(e, "#c9a55a");
-          const ala = MeshBuilder.CreateCylinder("sombrero-ala", { height: 0.06, diameter: 1.5, tessellation: 20 }, e);
-          ala.material = paja;
-          ala.parent = mod.cabeza;
-          ala.position.y = 0.72;
-          const copa = MeshBuilder.CreateCylinder("sombrero-copa", { height: 0.4, diameterTop: 0.55, diameterBottom: 0.7, tessellation: 16 }, e);
-          copa.material = paja;
-          copa.parent = mod.cabeza;
-          copa.position.y = 0.92;
-        }
-      } catch {
-        /* sin modelo: queda el personaje de formas */
-      }
-      this.chulla = ch;
       estallido(e, lugar.add(new Vector3(0, 1.5, 0)), ["#bfe3ff", "#7dffb0", "#ffffff"], 90, 7);
     }
     await hablar(m.jefe.llega);
@@ -947,11 +1136,15 @@ export class MisionJuego {
         this.golpearBug(b);
       }
       for (const it of this.items.filter((i) => !i.tomado)) this.recoger(it);
+      for (const j of this.jaulas.filter((x) => !x.libre)) {
+        j.vida = 1;
+        this.golpearJaula(j);
+      }
       if (m.exploracion.tipo === "proteger") {
         this.progreso = m.exploracion.total;
         this.listoParaJefe();
       }
     },
-    estado: () => ({ fase: this.fase, progreso: this.progreso, bugs: this.bugsVivos, items: this.items.filter((i) => !i.tomado).length, enDuelo: this.enDuelo }),
+    estado: () => ({ fase: this.fase, progreso: this.progreso, bugs: this.bugsVivos, items: this.items.filter((i) => !i.tomado).length + this.jaulas.filter((j) => !j.libre).length, enDuelo: this.enDuelo }),
   };
 }

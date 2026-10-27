@@ -40,7 +40,7 @@ export interface Mision {
   dificultad: 1 | 2 | 3;
   recompensa: number;
   logro: string;
-  exploracion: { tipo: "recoger" | "proteger" | "semillas"; total: number; objetivo: string; item: string };
+  exploracion: { tipo: "recoger" | "proteger" | "semillas" | "rescatar"; total: number; objetivo: string; item: string };
   jefe: { nombre: string; tipo: "bug" | "chullachaqui"; color: string; tiempoAtaque: number; llega: Linea[]; derrota: Linea[] };
   rondas: Ronda[];
   ficha: { nombre: string; icono: string; dato: string };
@@ -297,23 +297,24 @@ export const MISIONES: Mision[] = [
   {
     id: "chullachaqui",
     numero: 3,
-    nombre: "El Chullachaqui",
+    nombre: "Rescate en la selva",
     icono: "🌳",
     lugar: "Selva del Ucayali",
     ambiente: "selva",
     quien: "yachaq",
     pedido: [
-      { quien: "yachaq", texto: "Wawa, soy el abuelo Yachaq. En la selva del Ucayali están talando árboles y la gente se pierde en el monte…" },
+      { quien: "yachaq", texto: "Wawa, soy el abuelo Yachaq, del Ucayali. ¡Los Bugs-taladores encerraron a los animales en jaulas y están cortando los árboles!" },
+      { quien: "yachaq", texto: "El otorongo, el mono, el perezoso, el guacamayo… ¡hay que liberarlos! Y cuidado: en el monte anda el Chullachaqui." },
       { quien: "yachaq", texto: "Dicen que es el Chullachaqui: toma la forma de alguien que conoces para que lo sigas. Mírale los pies: uno es distinto al otro." },
       { quien: "yachaq", texto: "Pero él no es malo: es el guardián del bosque. Castiga a quien daña la selva. Muéstrale que vienes a cuidarla." },
-      { quien: "tuki", texto: "Kraa… me tiemblan las plumas. Lleva las semillas de lupuna, {nombre}. Y no sigas a nadie sin pensar: usa if y else." },
+      { quien: "tuki", texto: "Kraa… me tiemblan las plumas. Rompe las jaulas con tu 🎯 huaraca, {nombre}. Y no sigas ninguna voz sin pensar: usa if y else." },
     ],
-    amenaza: "Neblina, voces que engañan y el Chullachaqui",
+    amenaza: "Bugs-taladores, voces que engañan y el Chullachaqui",
     aprendes: "if / else y funciones (def)",
     dificultad: 3,
     recompensa: 50,
     logro: "mision-chullachaqui",
-    exploracion: { tipo: "semillas", total: 4, objetivo: "Junta las semillas de lupuna (no sigas las voces)", item: "semilla" },
+    exploracion: { tipo: "rescatar", total: 4, objetivo: "Libera a los animales de sus jaulas", item: "animal" },
     jefe: {
       nombre: "Chullachaqui",
       tipo: "chullachaqui",
@@ -390,7 +391,7 @@ export const MISIONES: Mision[] = [
     ficha: {
       nombre: "El Chullachaqui, guardián del bosque",
       icono: "🌳",
-      dato: "Ser de la tradición amazónica peruana. Su nombre viene del quechua: chulla (desigual) y chaqui (pie). Se dice que toma la forma de alguien conocido para perder a los caminantes, y que protege a los animales y plantas de la selva de quienes la dañan.",
+      dato: "Ser de la tradición amazónica peruana. Su nombre viene del quechua: chulla (desigual) y chaqui (pie). Se dice que toma la forma de alguien conocido para perder a los caminantes, y que protege a los animales y plantas de la selva de quienes la dañan. En esa selva viven el otorongo (jaguar), el mono, el perezoso y el guacamayo.",
     },
   },
 ];

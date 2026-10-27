@@ -10,6 +10,8 @@ import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { material } from "./personajes";
 import type { Choque } from "./mundo";
+import { crearTerreno, crearPastizal, alturaTerreno, aguaViva, type OpcionesTerreno } from "./terreno";
+import { texturaHojarasca, texturaPasto } from "./texturas";
 
 function azar(semilla: number) {
   const x = Math.sin(semilla * 78.233) * 43758.5453;
@@ -34,8 +36,14 @@ export function crearSelva(escena: Scene) {
   };
 
   // Suelo de la selva y claro central
-  const suelo = agrega(MeshBuilder.CreateGround("pasto", { width: 140, height: 140 }, escena));
-  suelo.material = material(escena, "#2e6b2a");
+  const suMat = new StandardMaterial("m-suelo-selva", escena);
+  suMat.diffuseTexture = texturaHojarasca(escena, 40);
+  suMat.specularColor = new Color3(0.03, 0.03, 0.03);
+  const ladMat = new StandardMaterial("m-ladera-selva", escena);
+  ladMat.diffuseTexture = texturaPasto(escena, "#2d5f27", 30);
+  ladMat.specularColor = new Color3(0.03, 0.03, 0.03);
+  const OPC: OpcionesTerreno = { tamano: 260, plano: 33, alto: 18, material: suMat, ladera: ladMat };
+  for (const m of crearTerreno(escena, "pasto", OPC)) agrega(m);
   const claro = agrega(MeshBuilder.CreateDisc("plaza", { radius: 14, tessellation: 40 }, escena), 0, 0.02, 2);
   claro.rotation.x = Math.PI / 2;
   claro.material = material(escena, "#6aa84f");
@@ -47,6 +55,7 @@ export function crearSelva(escena: Scene) {
   aguaMat.emissiveColor = new Color3(0.05, 0.25, 0.35);
   const rio = agrega(MeshBuilder.CreateGround("agua", { width: 5, height: 80 }, escena), 17.5, 0.05, 0);
   rio.material = aguaMat;
+  aguaViva(escena, aguaMat, 6);
   for (let z = -36; z <= 36; z += 2.5) choques.push({ x: 17.5, z, r: 2.6 });
   for (let i = 0; i < 14; i++) {
     const roca = agrega(MeshBuilder.CreateSphere("roca", { diameter: 0.8 + azar(i) * 0.9, segments: 6 }, escena), 14.6 + azar(i + 3) * 0.6, 0.2, -30 + i * 4.6);
@@ -132,6 +141,47 @@ export function crearSelva(escena: Scene) {
     unidos.material = material(escena, "#3f9a3a");
     agrega(unidos, 0, 0, 0);
   }
+
+  // Selva espesa en los cerros (troncos y copas unidos por color: liviano para el celular)
+  const troncosLejos: Mesh[] = [];
+  const copasLejos: Mesh[][] = [[], [], []];
+  for (let i = 0; i < 150; i++) {
+    const a = azar(i * 5.3) * Math.PI * 2;
+    const d = 33 + azar(i * 2.9) * 55;
+    const x = Math.sin(a) * d;
+    const z = Math.cos(a) * d + 2;
+    const y = alturaTerreno(OPC, x, z);
+    const alto = 9 + azar(i * 1.7) * 9;
+    const t = MeshBuilder.CreateCylinder("tronco-lejos", { height: alto, diameterTop: 0.6, diameterBottom: 1.2, tessellation: 6 }, escena);
+    t.position.set(x, y + alto / 2, z);
+    troncosLejos.push(t);
+    for (let k = 0; k < 2; k++) {
+      const c = MeshBuilder.CreateSphere("copa-lejos", { diameter: 7 + azar(i + k) * 4, segments: 6 }, escena);
+      c.position.set(x + (k ? 1.6 : -1.4), y + alto + k, z + (k ? -1 : 1.2));
+      c.scaling.y = 0.55;
+      copasLejos[(i + k) % 3].push(c);
+    }
+  }
+  const tl = Mesh.MergeMeshes(troncosLejos, true);
+  if (tl) {
+    tl.material = tronco;
+    agrega(tl);
+  }
+  copasLejos.forEach((g, i) => {
+    const u = Mesh.MergeMeshes(g, true);
+    if (u) {
+      u.material = hojas[i];
+      agrega(u);
+    }
+  });
+  agrega(
+    crearPastizal(escena, "helechos-matas", OPC, 2200, ["#4caf50", "#1f5e2a"], (x, z) => {
+      if (x > 13 && x < 22 && Math.abs(z) < 42) return false;
+      if (Math.hypot(x, z - 2) < 13 && !(Math.abs(x) > 9)) return false;
+      if (Math.abs(x) < 2.5 && z < -4) return false;
+      return true;
+    }, 60)
+  );
 
   raiz.setEnabled(false);
 

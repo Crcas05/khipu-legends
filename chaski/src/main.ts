@@ -42,9 +42,11 @@ import { ValleJuego } from "./valleJuego";
 import { ZonaJuego } from "./zonaJuego";
 import { AtaquePueblo } from "./ataquePueblo";
 import { poblar } from "./paisaje";
+import { crearSol } from "./terreno";
 import { MisionJuego, LIMITE_MISION, INICIO_MISION } from "./misionJuego";
 import { MISIONES, type Mision } from "./datos/misiones";
-import { tarjetaMision, resultadoMision } from "./ui/misionUI";
+import { tarjetaMision, resultadoMision, listaMisiones } from "./ui/misionUI";
+import { llegaMensajero } from "./mensajero";
 import { INICIO_ZONA, LIMITE_ZONA } from "./zonaMundo";
 import { ZONAS, type Zona } from "./datos/zonas";
 import type { SitioZona } from "./datos/zonas";
@@ -74,21 +76,23 @@ escena.clearColor = CIELO;
 escena.ambientColor = new Color3(0.35, 0.35, 0.35);
 escena.fogMode = Scene.FOGMODE_LINEAR;
 escena.fogColor = new Color3(0.72, 0.86, 0.95);
-escena.fogStart = 60;
-escena.fogEnd = 150;
+escena.fogStart = 90;
+escena.fogEnd = 260;
 
 let radioBase = 20;
 let betaBase = 0.82;
 const camara = new ArcRotateCamera("camara", -Math.PI / 2, 0.92, 20, Vector3.Zero(), escena);
 camara.minZ = 0.5;
-camara.maxZ = 200;
+camara.maxZ = 420;
 function ajustarCamara() {
   const vertical = lienzo.clientHeight > lienzo.clientWidth;
   camara.fovMode = vertical ? ArcRotateCamera.FOVMODE_HORIZONTAL_FIXED : ArcRotateCamera.FOVMODE_VERTICAL_FIXED;
-  camara.fov = vertical ? 1.05 : 0.75;
-  camara.beta = vertical ? 0.56 : 0.82;
+  camara.fov = vertical ? 1.05 : 0.8;
+  // Cámara más lejos y más baja: se ve el valle, los cerros y el horizonte
+  const zoom = { cerca: 0.72, media: 1, lejos: 1.3 }[estado.camara] ?? 1;
+  camara.beta = vertical ? 0.92 : 1.13;
   betaBase = camara.beta;
-  radioBase = vertical ? 19 : 19;
+  radioBase = (vertical ? 27 : 25) * zoom;
   camara.radius = radioBase;
   document.body.classList.toggle("vertical", vertical);
 }
@@ -98,6 +102,8 @@ const cielo = new HemisphericLight("cielo", new Vector3(0.2, 1, -0.3), escena);
 cielo.intensity = 0.62;
 cielo.groundColor = new Color3(0.45, 0.42, 0.38);
 const sol = new DirectionalLight("sol", new Vector3(-0.5, -1, 0.6), escena);
+// Sol con halo, al fondo del valle (se ve detrás de los cerros)
+const solCielo = crearSol(escena, new Vector3(-0.35, -0.42, -1));
 sol.position = new Vector3(20, 40, -20);
 sol.intensity = 1.05;
 
@@ -118,7 +124,7 @@ llamasPueblo[1].raiz.rotation.y = -2;
 for (const l of llamasPueblo) mundo.choques.push({ x: l.raiz.position.x, z: l.raiz.position.z, r: 1.1 });
 const MAMA_POS = new Vector3(-5, 0, 3);
 const mama = new MamaKhipu(escena, MAMA_POS.x, MAMA_POS.z, 2.7);
-mundo.choques.push({ x: MAMA_POS.x, z: MAMA_POS.z, r: 0.9 });
+
 const marcador = crearMarcador(escena);
 marcador.position.set(MAMA_POS.x, 3.6, MAMA_POS.z);
 // Quienes encargan misiones en el pueblo (Mama Khipu, Sisa la guardaparque y el abuelo Yachaq)
@@ -128,7 +134,7 @@ sisa.raiz.rotation.y = -2.4;
 const yachaq = new Chaski(escena, true);
 yachaq.raiz.position.set(-7.5, 0, -6.5);
 yachaq.raiz.rotation.y = 2.4;
-const NPC_POS: Record<"mama" | "sisa" | "yachaq", Vector3> = { mama: MAMA_POS, sisa: sisa.raiz.position, yachaq: yachaq.raiz.position };
+const NPC_POS: Record<"mama" | "sisa" | "yachaq", Vector3> = { mama: mama.raiz.position, sisa: sisa.raiz.position, yachaq: yachaq.raiz.position };
 const marcadoresMision = (["mama", "sisa", "yachaq"] as const).map((q) => {
   const mk = crearMarcador(escena);
   mk.position.set(NPC_POS[q].x, 3.5, NPC_POS[q].z);
@@ -209,7 +215,7 @@ function destinoGuia(): Vector3 | null {
     return estado.paso === "valle" ? mejor : null;
   }
   if (region === "selva") return ["selva", "victoria"].includes(estado.paso) ? AMARU_POS : null;
-  if (["hablar1", "hablar2", "final", "taller"].includes(estado.paso)) return MAMA_POS;
+  if (["hablar1", "hablar2", "final", "taller"].includes(estado.paso)) return mama.raiz.position;
   if (estado.paso === "fuente") return Vector3.Zero();
   if (estado.paso === "techo") return new Vector3(-12, 0, 12);
   return null;
@@ -244,7 +250,7 @@ const destellos: ParticleSystem[] = NUDOS.map((p) => crearDestello(escena, p));
 const valores = { agua: false, techo: "gris", animo: "triste" };
 function aplicarValores() {
   mundo.control.agua(valores.agua);
-  if (valores.agua) chorro.start();
+  if (valores.agua && !enPortada && region === "plaza") chorro.start();
   else chorro.stop();
   mundo.control.techo(valores.techo);
   mundo.control.bug(!yaPaso("techo"));
@@ -263,6 +269,8 @@ function aplicarCalidad(nueva: Calidad) {
   sombras = null;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   motor.setHardwareScalingLevel(nueva === "alto" ? 1 / dpr : nueva === "medio" ? 1 / Math.min(dpr, 1.5) : 1.25);
+  // En calidad baja no se dibujan las matas de pasto (miles de hojitas): el juego va más fluido
+  for (const m of escena.meshes) if (/matas|ichu-|helechos-/.test(m.name)) m.isVisible = nueva !== "bajo";
   if (nueva !== "bajo") {
     sombras = new ShadowGenerator(nueva === "alto" ? 2048 : 1024, sol);
     sombras.usePercentageCloserFiltering = true;
@@ -301,7 +309,7 @@ const ETIQUETAS: Etiqueta[] = [
   { clave: "fuente", posicion: () => new Vector3(0, 3.6, 0), texto: () => `fuente.agua = ${valores.agua ? "True" : "False"}`, editable: () => estado.paso === "fuente" },
   { clave: "casa", posicion: () => new Vector3(-12, 4.9, 12), texto: () => `casa.techo = "${valores.techo}"`, editable: () => estado.paso === "techo" },
   { clave: "yaru", posicion: () => new Vector3(4, 3.4, -4), texto: () => `yaru.animo = "${valores.animo}"`, editable: () => false },
-  { clave: "mama", posicion: () => new Vector3(MAMA_POS.x, 3.5, MAMA_POS.z), texto: () => `mama_khipu.rol = "guardiana"`, editable: () => false },
+  { clave: "mama", posicion: () => mama.raiz.position.add(new Vector3(0, 3.5, 0)), texto: () => `mama_khipu.rol = "guardiana"`, editable: () => false },
   { clave: "punku", region: "selva", posicion: () => PUERTA.add(new Vector3(0, 6.6, 0)), texto: () => `punku.abierta = ${yaPaso("ecos") ? "True" : "False"}`, editable: () => false },
   { clave: "rumi", region: "selva", posicion: () => new Vector3(0, 2.2, 7), texto: () => `rumi = [${PIEDRAS.map((_, i) => (rumiEncendidas[i] ? "True" : "False")).join(", ")}]`, editable: () => false },
   { clave: "amaru", region: "selva", posicion: () => amaru.raiz.position.add(new Vector3(0, 3.6, 0)), texto: () => `amaru.magia = "río"`, editable: () => false },
@@ -531,13 +539,7 @@ async function hablarConMama() {
       await ofrecerMision(q);
     });
   }
-  if (region === "plaza" && llego("completo") && misionPara("mama") && !estado.misiones.oro) {
-    let acepto = false;
-    await enCalma(async () => {
-      acepto = await ofrecerMision("mama");
-    });
-    if (acepto) return;
-  }
+
   await enCalma(async () => {
     switch (estado.paso) {
       case "hablar1":
@@ -567,15 +569,23 @@ async function hablarConMama() {
         desbloquear("episodio1");
         chaski.festejar();
         await nuevoNivel(APRENDIDO);
-        await despuesDelEpisodio1();
+        window.setTimeout(() => void siguienteMensaje(), 1800);
         break;
       case "taller":
         await usarTaller();
         break;
-      case "completo":
-        await hablar([{ quien: "mama", texto: "El Bug Ch'aqwa se esconde en la selva, {nombre}. ¿Estás listo para el viaje?" }]);
-        await despuesDelEpisodio1();
+      case "completo": {
+        const pendiente = MISIONES.find((x) => !estado.misiones[x.id]);
+        if (pendiente) {
+          await hablar([{ quien: "mama", texto: `El cóndor trajo noticias: «${pendiente.nombre}». ¡Te necesitan, {nombre}!` }]);
+          const ok = await tarjetaMision(pendiente);
+          if (ok) window.setTimeout(() => void iniciarMision(pendiente), 50);
+        } else {
+          await hablar([{ quien: "mama", texto: "El Bug Ch'aqwa se esconde en la selva, {nombre}. ¿Estás listo para el viaje?" }]);
+          await despuesDelEpisodio1();
+        }
         break;
+      }
       default:
         await hablar([{ quien: "mama", texto: "Usa el Ojo, {nombre}. El pueblo te necesita." }]);
     }
@@ -646,17 +656,18 @@ async function viajarA(destino: Region) {
   mostrarNpcs();
   if (misionActiva && misionActual) {
     await misionJuego.entrar(misionActual);
+    for (const m of escena.meshes) if (/matas|ichu-|helechos-/.test(m.name)) m.isVisible = calidad !== "bajo";
     fijarObjetivo(`${misionActual.exploracion.objetivo}: 0/${misionActual.exploracion.total}`);
   }
   camara.target.copyFrom(chaski.raiz.position);
   escena.fogColor = zonaJuego.mundo ? zonaJuego.mundo.niebla : selvaActiva ? new Color3(0.55, 0.72, 0.55) : new Color3(0.72, 0.86, 0.95);
-  escena.fogStart = selvaActiva ? 28 : zona?.ambiente === "nubes" ? 22 : plazaActiva ? 60 : 45;
-  escena.fogEnd = selvaActiva ? 70 : zona?.ambiente === "nubes" ? 60 : plazaActiva ? 150 : 95;
+  escena.fogStart = selvaActiva ? 34 : zona?.ambiente === "nubes" ? 30 : plazaActiva ? 90 : 60;
+  escena.fogEnd = selvaActiva ? 110 : zona?.ambiente === "nubes" ? 80 : plazaActiva ? 260 : 140;
   if (misionActiva && misionActual) {
     const amb = misionActual.ambiente;
     escena.fogColor = amb === "selva" ? new Color3(0.22, 0.32, 0.26) : amb === "puna" ? new Color3(0.78, 0.86, 0.95) : new Color3(0.8, 0.84, 0.9);
-    escena.fogStart = amb === "selva" ? 6 : 55;
-    escena.fogEnd = amb === "selva" ? 36 : 160;
+    escena.fogStart = amb === "selva" ? 14 : 80;
+    escena.fogEnd = amb === "selva" ? 70 : 240;
   }
   $("valle-titulo").textContent = zona ? `${zona.numero}. ${zona.nombre}` : "🌿 Naturaleza";
   sol.intensity = selvaActiva ? 0.9 : misionActiva && misionActual?.ambiente === "selva" ? 0.55 : 1.05;
@@ -1067,6 +1078,7 @@ async function ofrecerMision(quien: "mama" | "sisa" | "yachaq"): Promise<boolean
 }
 
 async function iniciarMision(m: Mision) {
+  if (region === "mision") return;
   misionActual = m;
   await viajarA("mision");
   aviso(`${m.icono} ${m.nombre}: ${m.exploracion.objetivo}. ¡Sigue la flecha!`, 3500);
@@ -1089,9 +1101,78 @@ async function terminarMision(r: { ganado: boolean; errores: number; golpes: num
   if (eleccion === "repetir") await viajarA("mision");
   else {
     await viajarA("plaza");
-    const siguiente = MISIONES.find((x) => x.numero === m.numero + 1);
-    if (siguiente && !estado.misiones[siguiente.id]) aviso(`❗ ${siguiente.quien === "sisa" ? "Sisa, la guardaparque" : "El abuelo Yachaq"} te busca: tiene una nueva misión.`, 4000);
+    window.setTimeout(() => void siguienteMensaje(), 2500);
   }
+}
+
+// ---------------------------------------------------------------------------
+// LA HISTORIA LLEGA SOLA: Mama Khipu camina hacia Chaski; cóndor y guacamayo traen misiones
+// ---------------------------------------------------------------------------
+let mensajeEnCurso = false;
+/** Trae (con un ave mensajera) la siguiente misión pendiente; si ya no hay, el aviso de la selva. */
+async function siguienteMensaje() {
+  if (mensajeEnCurso || region !== "plaza" || !llego("completo")) return;
+  mensajeEnCurso = true;
+  try {
+    await enCalma(async () => {
+      const m = MISIONES.find((x) => !estado.misiones[x.id]);
+      const ave = m?.ambiente === "selva" ? "guacamayo" : "condor";
+      const mensajero = llegaMensajero(escena, ave, chaski.raiz.position);
+      aviso(ave === "condor" ? "📯 ¡Suena el pututo! Un cóndor baja del cielo con un khipu…" : "📯 ¡Un guacamayo llega volando desde la selva con un khipu!", 3200);
+      await mensajero.aterriza;
+      if (region !== "plaza") {
+        mensajero.vete();
+        return;
+      }
+      if (m) {
+        await hablar([{ quien: "narrador", texto: ave === "condor" ? "El cóndor deja caer el khipu a tus pies. Sus nudos cuentan un mensaje urgente…" : "El guacamayo grita y suelta el khipu: ¡viene de la selva del Ucayali!" }, ...m.pedido]);
+        const ok = await tarjetaMision(m);
+        mensajero.vete();
+        if (ok) window.setTimeout(() => void iniciarMision(m), 50);
+        else aviso("Cuando quieras, toca 📜 MISIONES para empezar.", 3500);
+      } else {
+        await hablar([
+          { quien: "narrador", texto: "El cóndor trae un khipu atado con hilo verde: es de Amaru." },
+          { quien: "amaru", texto: "{nombre}, encontré el escondite del Bug Ch'aqwa en la selva. ¡Ven pronto, te espero junto al río!" },
+        ]);
+        mensajero.vete();
+        await despuesDelEpisodio1();
+      }
+    });
+  } finally {
+    mensajeEnCurso = false;
+  }
+}
+
+/** Mama Khipu viene caminando hacia Chaski cuando tiene algo que decirle. */
+let esperaMama = 0;
+function mamaDebeVenir() {
+  if (!jugando || enPortada || region !== "plaza" || ocupado || dialogoAbierto() || batalla.activa || misionJuego.enDuelo) return false;
+  if (ataque.mamaAtrapada || ataque.modo !== "nada" || ataque.bugsVivos > 0) return false;
+  if (estado.paso === "final") return estado.pueblo.jefe;
+  return estado.paso === "hablar1" || estado.paso === "hablar2";
+}
+function moverMama(dt: number) {
+  if (!mamaDebeVenir()) {
+    esperaMama = 0;
+    return;
+  }
+  esperaMama += dt;
+  if (esperaMama < 1.2) return;
+  const p = chaski.raiz.position;
+  const m = mama.raiz.position;
+  const d = Math.hypot(p.x - m.x, p.z - m.z);
+  mama.raiz.rotation.y = Math.atan2(p.x - m.x, p.z - m.z);
+  if (d > 2.4) {
+    const paso = Math.min(d - 2.3, 3.4 * dt);
+    m.x += ((p.x - m.x) / d) * paso;
+    m.z += ((p.z - m.z) / d) * paso;
+    m.y = Math.abs(Math.sin(performance.now() / 120)) * 0.08;
+    return;
+  }
+  m.y = 0;
+  esperaMama = 0;
+  void hablarConMama();
 }
 
 // ---------------------------------------------------------------------------
@@ -1193,7 +1274,7 @@ function pintarMinimapa(dt: number) {
   };
   const d = ataque.puntosMapa();
   for (const b of d.burbujas) punto(b.x, b.z, "rgba(199,139,255,.9)", 9);
-  punto(MAMA_POS.x, MAMA_POS.z, "#ff7ab6", 7);
+  punto(mama.raiz.position.x, mama.raiz.position.z, "#ff7ab6", 7);
   for (const b of d.bugs) punto(b.x, b.z, "#8b3dff", 6);
   if (d.jefe) punto(d.jefe.x, d.jefe.z, "#ff3355", 12);
   if (d.runa) punto(d.runa.x, d.runa.z, "#e3c2ff", 7);
@@ -1226,6 +1307,7 @@ function actualizarBotones() {
   $("boton-rescatar").hidden = !(liberar || (region === "valle" ? sitioActual : region === "zona" ? altarActual : null)) || ocupado;
   $("boton-rescatar").innerHTML = liberar ? "🫧<br>LIBERAR" : region === "zona" ? "📘<br>APRENDER" : "🔧<br>RESCATAR";
   $("chip-mapa").hidden = !yaPaso("victoria") || batalla.activa;
+  $("chip-misiones").hidden = !llego("completo") || batalla.activa || region === "mision";
   $("boton-taller").hidden = !(["taller", "final", "completo", "forja", "batalla", "victoria", "completo2"].includes(estado.paso)) || batalla.activa;
   $("boton-accion").hidden = !yaPaso("hablar1");
   const avisar = ["hablar1", "hablar2", "final"].includes(estado.paso);
@@ -1293,6 +1375,15 @@ $("boton-huaraca").addEventListener("pointerdown", (e) => {
   else if (region === "zona") zonaJuego.disparar(adelanteDeChaski());
   else valleJuego.disparar(adelanteDeChaski());
 });
+$("chip-misiones").addEventListener("click", () => {
+  sonido.toque();
+  void enCalma(async () => {
+    const m = await listaMisiones(MISIONES);
+    if (!m) return;
+    const ok = await tarjetaMision(m);
+    if (ok) window.setTimeout(() => void iniciarMision(m), 50);
+  });
+});
 $("chip-mapa").addEventListener("click", () => {
   sonido.toque();
   enCalma(irAlMapa);
@@ -1343,6 +1434,34 @@ $("boton-voz").addEventListener("click", () => {
   pintarVoz();
   if (estado.voz) decir("¡Allillanchu! Ahora leeré los diálogos en voz alta.", "tuki");
 });
+// Cámara: cerca / media / lejos (y la rueda del mouse o dos dedos para acercar o alejar)
+const pintarCamara = () => document.querySelectorAll<HTMLButtonElement>("[data-camara]").forEach((b) => b.classList.toggle("activo", b.dataset.camara === estado.camara));
+pintarCamara();
+document.querySelectorAll<HTMLButtonElement>("[data-camara]").forEach((b) =>
+  b.addEventListener("click", () => {
+    estado.camara = b.dataset.camara as typeof estado.camara;
+    guardar();
+    ajustarCamara();
+    pintarCamara();
+  })
+);
+lienzo.addEventListener(
+  "wheel",
+  (e) => {
+    if (!jugando) return;
+    e.preventDefault();
+    radioBase = Math.min(42, Math.max(13, radioBase * (e.deltaY > 0 ? 1.08 : 0.93)));
+  },
+  { passive: false }
+);
+let distanciaDedos = 0;
+lienzo.addEventListener("touchmove", (e) => {
+  if (!jugando || e.touches.length !== 2) return;
+  const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+  if (distanciaDedos) radioBase = Math.min(42, Math.max(13, radioBase * (distanciaDedos / d)));
+  distanciaDedos = d;
+});
+lienzo.addEventListener("touchend", () => (distanciaDedos = 0));
 $("cerrar-ajustes").addEventListener("click", () => ($("ajustes").hidden = true));
 $("boton-reiniciar").addEventListener("click", () => {
   if (confirmarDoble($("boton-reiniciar") as HTMLButtonElement)) {
@@ -1487,6 +1606,10 @@ escena.onBeforeRenderObservable.add(() => {
     }
   }
   pintarMinimapa(dt);
+  if (region === "plaza") {
+    moverMama(dt);
+    marcador.position.set(mama.raiz.position.x, 3.6 + Math.sin(performance.now() / 300) * 0.1, mama.raiz.position.z);
+  }
   if (region === "mision") misionJuego.actualizar(dt, !jugando || ocupado || dialogoAbierto());
   listaCada -= dt;
   if (listaCada <= 0) {
@@ -1549,7 +1672,9 @@ escena.onBeforeRenderObservable.add(() => {
     camara.beta += ((misionJuego.enDuelo ? 1.12 : betaBase) - camara.beta) * Math.min(1, dt * 4);
     camara.target.copyFrom(Vector3.Lerp(camara.target, pos.add(new Vector3(0, 1.2, 0)), Math.min(1, dt * 6)).add(sacudida.tomar(dt)));
     // Cámara de cine: se acerca durante los diálogos
-    const radioObjetivo = misionJuego.enDuelo ? 12 : dialogoAbierto() ? radioBase * 0.72 : radioBase;
+    // En lugares cerrados (selva, templo) la cámara no se aleja tanto: si no, queda dentro de los árboles
+    const tope = region === "mision" ? (misionActual?.ambiente === "selva" ? 15 : misionActual?.ambiente === "templo" ? 21 : 30) : region === "selva" ? 19 : 60;
+    const radioObjetivo = misionJuego.enDuelo ? 12 : Math.min(tope, dialogoAbierto() ? radioBase * 0.72 : radioBase);
     camara.radius += (radioObjetivo - camara.radius) * Math.min(1, dt * 3);
   }
   // Flecha guía
@@ -1596,7 +1721,7 @@ escena.onBeforeRenderObservable.add(() => {
   }
   if (estado.palabras.length >= 6) desbloquear("simi");
 
-  const cerca = jugando && (region === "plaza" || region === "selva") && Vector3.Distance(pos, region === "selva" ? AMARU_POS : MAMA_POS) < 3.8;
+  const cerca = jugando && (region === "plaza" || region === "selva") && Vector3.Distance(pos, region === "selva" ? AMARU_POS : mama.raiz.position) < 3.8;
   const npc = jugando && region === "plaza" && llego("completo") ? ((["sisa", "yachaq"] as const).find((q) => Vector3.Distance(pos, NPC_POS[q]) < 3.4) ?? null) : null;
   if (npc !== npcCercano) {
     npcCercano = npc;
@@ -1606,7 +1731,8 @@ escena.onBeforeRenderObservable.add(() => {
     mirarSuave(sisa.raiz, pos, dt, 6);
     mirarSuave(yachaq.raiz, pos, dt, 6);
     for (const { q, mk } of marcadoresMision) {
-      mk.setEnabled(!enPortada && !!misionPara(q) && !estado.misiones[misionPara(q)!.id]);
+      mk.setEnabled(false);
+      void q;
       mk.position.y = 3.5 + Math.sin(performance.now() / 300) * 0.12;
     }
   }
@@ -1718,6 +1844,7 @@ function modoPortada(activa: boolean) {
   for (const m of mundo.mallas) m.setEnabled(plaza);
   for (const g of mundo.glitches) g.setEnabled(plaza);
   mundo.cupula.setEnabled(!activa);
+  solCielo.setEnabled(!activa);
   for (const n of mundo.nubes) n.setEnabled(!activa);
   mama.raiz.setEnabled(plaza);
   mostrarNpcs();
@@ -1797,6 +1924,8 @@ async function empezar() {
     await enCalma(() => ataque.empezarOla(true));
   } else {
     aviso(`¡Bienvenido de vuelta! ${document.getElementById("objetivo-texto")!.textContent}`, 3500);
+    // Si terminó el Episodio 1 y hay una misión pendiente, el mensajero llega solo
+    if (region === "plaza" && estado.paso === "completo" && MISIONES.some((x) => !estado.misiones[x.id])) window.setTimeout(() => void siguienteMensaje(), 3500);
   }
 }
 
