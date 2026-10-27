@@ -30,7 +30,7 @@ interface Paleta {
   nieve: boolean;
 }
 const PALETAS: Record<Ambiente, Paleta> = {
-  altiplano: { suelo: "#a39a7a", sueloRestaurado: "#c4b47a", niebla: [0.78, 0.86, 0.95], apu: ["#8c8270", "#7d735f"], nieve: true },
+  altiplano: { suelo: "#8f8a6e", sueloRestaurado: "#a99d68", niebla: [0.78, 0.86, 0.95], apu: ["#8c8270", "#7d735f"], nieve: true },
   selva: { suelo: "#3d6b33", sueloRestaurado: "#3f9a3a", niebla: [0.55, 0.72, 0.55], apu: ["#2f6b33", "#3a7a3a"], nieve: false },
   nubes: { suelo: "#5e7d55", sueloRestaurado: "#6aa84f", niebla: [0.85, 0.88, 0.9], apu: ["#4f6b4a", "#5a7a52"], nieve: false },
   piedra: { suelo: "#8a8a74", sueloRestaurado: "#9fae7a", niebla: [0.78, 0.84, 0.9], apu: ["#7a7a6a", "#6c7360"], nieve: true },

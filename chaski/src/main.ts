@@ -40,11 +40,12 @@ import { INICIO_ZONA, LIMITE_ZONA } from "./zonaMundo";
 import { ZONAS, type Zona } from "./datos/zonas";
 import type { SitioZona } from "./datos/zonas";
 import { abrirMapa } from "./ui/mapa";
+import { JEFES } from "./datos/jefes";
 import { INTRO_VALLE, FIN_VALLE, APRENDIDO_VALLE, codigoSitio } from "./datos/valle";
 import { abrirBloques } from "./ui/bloques";
 import { BLOQUES_2, LLEGADA, AMARU_1, ECOS_LISTOS, ANTES_BATALLA, VICTORIA, APRENDIDO_2, RETO_RAYO } from "./datos/episodio2";
 import { desbloquear, abrirSimiQillqa, TOTAL_NUDOS } from "./ui/logros";
-import { sonido, despertarAudio, iniciarMusica, alternarSilencio, estaSilenciado } from "./sonido";
+import { sonido, despertarAudio, iniciarMusica, alternarSilencio, estaSilenciado, cambiarMusica } from "./sonido";
 import { crearModelo, ponerChullo, ponerMontera } from "./modelos";
 import { crearChorro, estallido, crearPolvo, crearDestello, Sacudida } from "./efectos";
 import type { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
@@ -542,6 +543,7 @@ async function viajarA(destino: Region) {
   $("valle-titulo").textContent = zona ? `${zona.numero}. ${zona.nombre}` : "🌿 Naturaleza";
   sol.intensity = selvaActiva ? 0.9 : 1.05;
   document.body.dataset.region = destino;
+  if (!zonaActiva) cambiarMusica(selvaActiva ? (batalla.activa ? "batalla" : "selva") : "andes");
   actualizarBotones();
   await new Promise((r) => window.setTimeout(r, 200));
   velo.classList.remove("cubre");
@@ -695,9 +697,11 @@ const batalla = new Batalla({
 
 function empezarBatalla() {
   actualizarBotones();
+  cambiarMusica("batalla");
   aviso("¡Usa tus cartas Q, W, E! Esquiva el suelo rojo.", 3500);
   batalla.iniciar().then(() =>
     enCalma(async () => {
+      cambiarMusica("selva");
       desbloquear("jefe");
       ganarKallpa(25);
       avanzar("victoria");
@@ -746,6 +750,7 @@ const zonaJuego = new ZonaJuego({
   ganarKallpa,
   desbloquear,
   alAvanzar: (z: Zona) => fijarObjetivo(objetivoDeZona(z)),
+  pausa: (f) => enCalma(f),
   alTerminar: (z: Zona) =>
     enCalma(async () => {
       sonido.nivel();
@@ -760,7 +765,9 @@ const zonaJuego = new ZonaJuego({
 
 function objetivoDeZona(z: Zona) {
   const hechos = estado.zonas[z.id]?.length ?? 0;
-  return hechos >= z.sitios.length ? `¡${z.nombre} restaurado! Toca 🗺 para seguir el viaje` : `Restaura los altares de ${z.nombre}: ${hechos}/${z.sitios.length} (sigue la flecha)`;
+  if (hechos < z.sitios.length) return `Restaura los altares de ${z.nombre}: ${hechos}/${z.sitios.length} (sigue la flecha)`;
+  if (!estado.jefes.includes(z.id)) return "⚔️ ¡Vence al jefe! Rompe su escudo con la 🔮 runa y dispárale";
+  return `¡${z.nombre} restaurado! Toca 🗺 para seguir el viaje`;
 }
 
 function nodoGuia() {
@@ -994,7 +1001,7 @@ function medir() {
 let jugando = false;
 escena.onBeforeRenderObservable.add(() => {
   const dt = Math.min(motor.getDeltaTime() / 1000, 0.05);
-  const bloqueado = !jugando || ocupado || dialogoAbierto();
+  const bloqueado = !jugando || ocupado || dialogoAbierto() || zonaJuego.preguntando;
   let dx = bloqueado ? 0 : entrada.x;
   let dz = bloqueado ? 0 : -entrada.y;
   if (!bloqueado) {
@@ -1289,6 +1296,7 @@ motor.runRenderLoop(() => escena.render());
 window.setInterval(medir, 500);
 
 if (new URLSearchParams(location.search).has("prueba")) {
+  (window as unknown as Record<string, unknown>).__jefes = JEFES;
   (window as unknown as Record<string, unknown>).__juego = {
     estado: () => ({ ...estado, x: chaski.raiz.position.x, z: chaski.raiz.position.z, ojo: ojoAbierto, valores: { ...valores } }),
     ir: (x: number, z: number) => chaski.raiz.position.set(x, 0, z),
@@ -1297,6 +1305,7 @@ if (new URLSearchParams(location.search).has("prueba")) {
     camara,
     amaru,
     valle: { bugsVivos: () => ({ cerca: region === "zona" ? zonaJuego.bugsCerca() : valleJuego.bugsCerca() }) },
+    zj: zonaJuego,
     zona: () => ({ id: zonaJuego.zona?.id, hechos: estado.zonas[zonaJuego.zona?.id ?? ""] ?? [], sitios: zonaJuego.zona?.sitios.map((s) => [s.id, s.x, s.z]) }),
   };
 }

@@ -171,37 +171,247 @@ export const sonido = {
   },
 };
 
-/** Música de fondo: frases de quena en pentatónica sobre un bordón suave. Se genera sola, nunca se repite igual. */
-export function iniciarMusica() {
+// =============================================================================
+// Música por estilo: cada región tiene sus instrumentos (todo sintetizado, original)
+// =============================================================================
+export type Estilo = "andes" | "altiplano" | "selva" | "costa" | "feria" | "cumbre" | "batalla";
+let estilo: Estilo = "andes";
+let generacion = 0;
+let fuentesAmbiente: AudioScheduledSourceNode[] = [];
+
+interface Receta {
+  bpm: number;
+  bordon: number | null; // frecuencia del bordón (null = sin bordón)
+  melodia: "quena" | "zampona" | "flauta" | null;
+  registro: number; // desplazamiento en la escala
+  ritmo: ("bombo" | "cajon" | "maraca" | "charango" | "tambor" | "-")[][]; // por compás: 8 corcheas
+  ambiente: ("viento" | "aves" | "agua" | "olas")[];
+  pausa: [number, number]; // silencio entre frases (s)
+}
+
+const RECETAS: Record<Estilo, Receta> = {
+  andes: { bpm: 84, bordon: 110, melodia: "quena", registro: 0, ritmo: [["charango", "-", "-", "charango", "-", "charango", "-", "-"]], ambiente: ["viento"], pausa: [1.5, 3] },
+  altiplano: { bpm: 96, bordon: 98, melodia: "zampona", registro: -1, ritmo: [["bombo", "-", "charango", "charango", "bombo", "-", "charango", "-"]], ambiente: ["viento", "agua"], pausa: [1, 2.5] },
+  selva: { bpm: 100, bordon: null, melodia: "flauta", registro: 1, ritmo: [["tambor", "-", "maraca", "-", "tambor", "tambor", "maraca", "-"]], ambiente: ["aves", "agua"], pausa: [2, 4] },
+  costa: { bpm: 88, bordon: 82, melodia: "quena", registro: -1, ritmo: [["cajon", "-", "-", "maraca", "cajon", "-", "maraca", "-"]], ambiente: ["olas", "viento"], pausa: [2, 4] },
+  feria: { bpm: 112, bordon: 110, melodia: "quena", registro: 1, ritmo: [["cajon", "-", "maraca", "cajon", "-", "cajon", "maraca", "-"], ["cajon", "-", "maraca", "-", "cajon", "cajon", "maraca", "cajon"]], ambiente: [], pausa: [0.8, 2] },
+  cumbre: { bpm: 72, bordon: 73.4, melodia: "quena", registro: 2, ritmo: [["bombo", "-", "-", "-", "charango", "-", "-", "-"]], ambiente: ["viento", "aves"], pausa: [2, 3.5] },
+  batalla: { bpm: 138, bordon: 55, melodia: "quena", registro: 3, ritmo: [["bombo", "-", "tambor", "bombo", "bombo", "-", "tambor", "tambor"]], ambiente: [], pausa: [0.3, 0.8] },
+};
+
+function ruidoBuffer(c: AudioContext, segundos: number) {
+  const b = c.createBuffer(1, Math.floor(c.sampleRate * segundos), c.sampleRate);
+  const d = b.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  return b;
+}
+
+/** Golpe de percusión o rasgueo, en el bus de música. */
+function percusion(tipo: string, t: number, notaBase: number) {
+  const c = ctx;
+  if (!c || !musica) return;
+  const g = c.createGain();
+  g.connect(musica);
+  if (tipo === "bombo" || tipo === "tambor") {
+    const o = c.createOscillator();
+    o.frequency.setValueAtTime(tipo === "bombo" ? 95 : 180, t);
+    o.frequency.exponentialRampToValueAtTime(tipo === "bombo" ? 42 : 90, t + 0.18);
+    g.gain.setValueAtTime(tipo === "bombo" ? 0.7 : 0.35, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+    o.connect(g);
+    o.start(t);
+    o.stop(t + 0.32);
+  } else if (tipo === "cajon" || tipo === "maraca") {
+    const n = c.createBufferSource();
+    n.buffer = ruidoBuffer(c, 0.2);
+    const f = c.createBiquadFilter();
+    f.type = tipo === "cajon" ? "lowpass" : "highpass";
+    f.frequency.value = tipo === "cajon" ? 900 : 5000;
+    g.gain.setValueAtTime(tipo === "cajon" ? 0.55 : 0.12, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + (tipo === "cajon" ? 0.14 : 0.06));
+    n.connect(f).connect(g);
+    n.start(t);
+    if (tipo === "cajon") percusion("tambor", t, notaBase);
+  } else if (tipo === "charango") {
+    // Rasgueo: 3 cuerdas pulsadas casi a la vez
+    g.gain.value = 0.16;
+    [0, 2, 4].forEach((k, i) => {
+      const o = c.createOscillator();
+      o.type = "triangle";
+      o.frequency.value = ESCALA[Math.min(ESCALA.length - 1, notaBase + k)] * 2;
+      const gg = c.createGain();
+      const ti = t + i * 0.015;
+      gg.gain.setValueAtTime(0.5, ti);
+      gg.gain.exponentialRampToValueAtTime(0.0001, ti + 0.35);
+      o.connect(gg).connect(g);
+      o.start(ti);
+      o.stop(ti + 0.4);
+    });
+  }
+}
+
+/** Zampoña: dos tubos levemente desafinados y el soplo del aire. */
+function zampona(f: number, inicio: number, dur: number) {
+  const c = ctx;
+  if (!c || !musica) return;
+  const t = c.currentTime + inicio;
+  const g = c.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(0.32, t + 0.06);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  g.connect(musica);
+  for (const d of [0, 3]) {
+    const o = c.createOscillator();
+    o.frequency.value = f + d;
+    o.connect(g);
+    o.start(t);
+    o.stop(t + dur + 0.05);
+  }
+  const n = c.createBufferSource();
+  n.buffer = ruidoBuffer(c, 0.25);
+  const bf = c.createBiquadFilter();
+  bf.type = "bandpass";
+  bf.frequency.value = f * 2;
+  const gn = c.createGain();
+  gn.gain.setValueAtTime(0.25, t);
+  gn.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+  n.connect(bf).connect(gn).connect(musica);
+  n.start(t);
+}
+
+function ambiente(tipos: Receta["ambiente"]) {
+  const c = ctx;
+  if (!c || !musica) return;
+  for (const f of fuentesAmbiente) {
+    try {
+      f.stop();
+    } catch {
+      /* ya detenida */
+    }
+  }
+  fuentesAmbiente = [];
+  for (const tipo of tipos) {
+    if (tipo === "viento" || tipo === "agua" || tipo === "olas") {
+      const n = c.createBufferSource();
+      n.buffer = ruidoBuffer(c, 4);
+      n.loop = true;
+      const f = c.createBiquadFilter();
+      f.type = tipo === "agua" ? "highpass" : "lowpass";
+      f.frequency.value = tipo === "viento" ? 500 : tipo === "agua" ? 3500 : 700;
+      const g = c.createGain();
+      g.gain.value = tipo === "viento" ? 0.1 : tipo === "agua" ? 0.035 : 0.12;
+      // Olas y viento suben y bajan lentamente
+      const lfo = c.createOscillator();
+      lfo.frequency.value = tipo === "olas" ? 0.12 : 0.07;
+      const lg = c.createGain();
+      lg.gain.value = g.gain.value * 0.8;
+      lfo.connect(lg).connect(g.gain);
+      n.connect(f).connect(g).connect(musica);
+      n.start();
+      lfo.start();
+      fuentesAmbiente.push(n, lfo);
+    }
+  }
+}
+
+function cantarAve() {
+  const c = ctx;
+  if (!c || !musica) return;
+  const t = c.currentTime;
+  const base = 1800 + Math.random() * 1600;
+  for (let i = 0; i < 2 + Math.floor(Math.random() * 3); i++) {
+    const o = c.createOscillator();
+    const g = c.createGain();
+    const ti = t + i * 0.13;
+    o.frequency.setValueAtTime(base, ti);
+    o.frequency.exponentialRampToValueAtTime(base * 1.6, ti + 0.08);
+    g.gain.setValueAtTime(0.05, ti);
+    g.gain.exponentialRampToValueAtTime(0.0001, ti + 0.1);
+    o.connect(g).connect(musica);
+    o.start(ti);
+    o.stop(ti + 0.12);
+  }
+}
+
+let bordonNodo: OscillatorNode | null = null;
+
+/** Música de fondo: melodía, ritmo y ambiente según el estilo. Se genera sola, nunca se repite igual. */
+export function iniciarMusica(nuevo?: Estilo) {
   const c = iniciar();
-  if (!c || !musica || musicaActiva) return;
+  if (!c || !musica) return;
+  if (nuevo) estilo = nuevo;
+  if (musicaActiva && !nuevo) return;
   musicaActiva = true;
-  // Bordón (como el de un charango lejano)
-  const bordon = c.createOscillator();
-  bordon.type = "triangle";
-  bordon.frequency.value = 110;
-  const gb = c.createGain();
-  gb.gain.value = 0.18;
-  const fb = c.createBiquadFilter();
-  fb.type = "lowpass";
-  fb.frequency.value = 400;
-  bordon.connect(fb).connect(gb).connect(musica);
-  bordon.start();
-  let paso = 4;
+  const gen = ++generacion;
+  const r = RECETAS[estilo];
+  // Bordón
+  bordonNodo?.stop();
+  bordonNodo = null;
+  if (r.bordon) {
+    const o = c.createOscillator();
+    o.type = "triangle";
+    o.frequency.value = r.bordon;
+    const g = c.createGain();
+    g.gain.value = 0.16;
+    const f = c.createBiquadFilter();
+    f.type = "lowpass";
+    f.frequency.value = 400;
+    o.connect(f).connect(g).connect(musica);
+    o.start();
+    bordonNodo = o;
+  }
+  ambiente(r.ambiente);
+  // Ritmo: se agenda compás por compás
+  const corchea = 30 / r.bpm;
+  let compas = 0;
+  let proximo = c.currentTime + 0.2;
+  const ritmo = () => {
+    if (gen !== generacion || !ctx) return;
+    while (proximo < ctx.currentTime + 0.6) {
+      const patron = r.ritmo[compas % r.ritmo.length];
+      patron.forEach((golpe, i) => golpe !== "-" && percusion(golpe, proximo + i * corchea, 3 + r.registro));
+      proximo += corchea * 8;
+      compas++;
+    }
+    window.setTimeout(ritmo, 200);
+  };
+  ritmo();
+  // Melodía
+  let paso = 4 + r.registro;
   const tocarFrase = () => {
-    if (!musicaActiva) return;
+    if (gen !== generacion) return;
     let t = 0;
     const notas = 4 + Math.floor(Math.random() * 4);
-    for (let i = 0; i < notas; i++) {
+    for (let i = 0; i < notas && r.melodia; i++) {
       paso = Math.max(0, Math.min(ESCALA.length - 1, paso + [-2, -1, -1, 1, 1, 2][Math.floor(Math.random() * 6)]));
-      const dur = [0.35, 0.35, 0.7, 1.05][Math.floor(Math.random() * 4)];
-      quena(ESCALA[paso], t, dur * 0.95, 0.5, musica!);
+      const dur = (estilo === "batalla" ? [0.5, 0.5, 1] : [1, 1, 2, 3])[Math.floor(Math.random() * (estilo === "batalla" ? 3 : 4))] * corchea;
+      if (r.melodia === "zampona") zampona(ESCALA[paso], t, dur * 0.95);
+      else quena(ESCALA[paso] * (r.melodia === "flauta" ? 2 : 1), t, dur * 0.95, r.melodia === "flauta" ? 0.32 : 0.5, musica!);
       t += dur;
     }
-    if (paso > 6) paso = 4;
-    window.setTimeout(tocarFrase, (t + 1.5 + Math.random() * 2.5) * 1000);
+    if (paso > 7 + Math.max(0, r.registro)) paso = 4 + r.registro;
+    if (r.ambiente.includes("aves") && Math.random() < 0.6) window.setTimeout(cantarAve, Math.random() * 2000);
+    window.setTimeout(tocarFrase, (t + r.pausa[0] + Math.random() * (r.pausa[1] - r.pausa[0])) * 1000);
   };
-  window.setTimeout(tocarFrase, 1200);
+  window.setTimeout(tocarFrase, 900);
+}
+
+/** Cambia el estilo de la música (por zona o al empezar una batalla). */
+export function cambiarMusica(nuevo: Estilo) {
+  if (nuevo === estilo && musicaActiva) return;
+  if (!musicaActiva) {
+    estilo = nuevo;
+    return;
+  }
+  iniciarMusica(nuevo);
+}
+export const estiloMusica = () => estilo;
+
+/** Alarma de amenaza: el Bug avanza. */
+export function alarma() {
+  const c = iniciar();
+  if (!c || !maestro) return;
+  for (let i = 0; i < 3; i++) tono(880, i * 0.3, 0.2, "square", 0.06, 440);
 }
 
 /** Baja la música mientras hay diálogo o retos, para no distraer. */

@@ -462,3 +462,24 @@ body.en-valle .botones-accion { flex-direction: column; }
 .consola div { white-space: pre; }
 .consola { overflow-x: auto; }
 .portada-arte { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -1; opacity: .55; }
+
+/* ---------- Suspenso: el Bug avanza ---------- */
+#amenaza { position: fixed; z-index: 6; top: calc(max(8px, env(safe-area-inset-top)) + 44px); left: 50%; transform: translateX(-50%); width: min(300px, 46vw); display: grid; gap: 3px; text-align: center; pointer-events: none;
+  background: rgba(30, 10, 50, .85); border: 2px solid #8b3dff; border-radius: 10px; padding: 4px 10px; font-size: 13px; font-weight: 800; color: #e3d0ff; }
+#amenaza .barra { width: 100%; height: 8px; border-width: 1px; }
+#amenaza-relleno { display: block; height: 100%; background: linear-gradient(90deg, #ff3355, #8b3dff); transition: width .2s linear; }
+#amenaza.urgente { border-color: #ff3355; animation: titila .5s infinite; }
+body.vertical #amenaza { top: 108px; left: auto; right: 8px; transform: none; width: 46vw; }
+body.amenaza::after { content: ""; position: fixed; inset: 0; z-index: 2; pointer-events: none; box-shadow: inset 0 0 120px rgba(139, 61, 255, .85); animation: titila .5s infinite; }
+
+/* ---------- Jefe de zona ---------- */
+#jefe-zona { position: fixed; z-index: 7; top: calc(max(8px, env(safe-area-inset-top)) + 44px); left: 50%; transform: translateX(-50%); width: min(420px, 60vw); display: grid; gap: 4px; text-align: center; pointer-events: none;
+  background: rgba(14, 18, 42, .9); border: 2px solid #ff3355; border-radius: 12px; padding: 6px 12px; }
+#jefe-zona b { color: #ffc2d0; font-size: 15px; }
+#jefe-zona .barra { width: 100%; }
+#jefe-zona-vida { display: block; height: 100%; background: linear-gradient(90deg, #8b3dff, #ff3355); transition: width .3s; }
+#jefe-zona code { font-size: 12px; color: var(--oro2); }
+body.vertical #jefe-zona { top: 150px; width: 90vw; }
+#amenaza { left: auto; right: max(8px, env(safe-area-inset-right)); transform: none; top: calc(max(8px, env(safe-area-inset-top)) + 46px); width: min(250px, 40vw); }
+#jefe-zona { top: calc(max(8px, env(safe-area-inset-top)) + 92px); }
+body.vertical #jefe-zona { top: 150px; }

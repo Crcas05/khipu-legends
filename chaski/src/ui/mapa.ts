@@ -14,7 +14,7 @@ export function zonaHecha(id: string): boolean {
   const z = ZONAS.find((x) => x.id === id);
   if (!z) return false;
   const hechos = estado.zonas[id] ?? [];
-  return z.sitios.every((s) => hechos.includes(s.id));
+  return z.sitios.every((s) => hechos.includes(s.id)) && estado.jefes.includes(id);
 }
 
 export function zonaAbierta(i: number): boolean {

@@ -28,12 +28,14 @@ export interface Estado {
   /** Paso donde quedó cada lección (para retomar). */
   leccionPaso: Record<string, number>;
   zonaActual: string;
+  /** Zonas cuyo jefe ya fue derrotado. */
+  jefes: string[];
 }
 
 const CLAVE = "chaski-runes-v1";
 
 function inicial(): Estado {
-  return { heroe: "", nombre: "", paso: "prologo", kallpa: 0, exp: 0, nivel: 1, palabras: [], codigo: "", logros: [], nudos: [], runas: {}, racha: 0, ultimoDia: "", rescates: [], inventario: {}, zonas: {}, sellos: {}, leccionPaso: {}, zonaActual: "" };
+  return { heroe: "", nombre: "", paso: "prologo", kallpa: 0, exp: 0, nivel: 1, palabras: [], codigo: "", logros: [], nudos: [], runas: {}, racha: 0, ultimoDia: "", rescates: [], inventario: {}, zonas: {}, sellos: {}, leccionPaso: {}, zonaActual: "", jefes: [] };
 }
 
 function cargar(): Estado {
