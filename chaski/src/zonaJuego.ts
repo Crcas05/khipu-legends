@@ -2,6 +2,7 @@
 // suspenso (el Bug avanza con una cuenta regresiva), rescate (lecciones en los altares)
 // y un jefe final por zona cuyo escudo solo cae respondiendo runas de esa zona.
 
+import { esquivoElGolpe } from "./movimiento";
 import { Scene } from "@babylonjs/core/scene";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
@@ -18,6 +19,8 @@ import { estado, guardar } from "./estado";
 import { estallido, Sacudida } from "./efectos";
 import { sonido, alarma, cambiarMusica, musicaSuave, type Estilo } from "./sonido";
 import { Jefe } from "./batalla";
+import { armaActual, lanzarProyectil, golpeChampi } from "./armas";
+import { ponerClima } from "./clima";
 
 const MATERIALES = ["piedra", "ichu", "adobe"];
 const AMENAZA = 120; // segundos que tarda el Bug en mandar una ola
@@ -67,6 +70,7 @@ interface MiniBug {
   sitio: string;
   golpeHasta: number;
   t: number;
+  quietoHasta?: number;
 }
 
 export function zonaCompleta(z: Zona) {
@@ -275,39 +279,37 @@ export class ZonaJuego {
   // ---------------------------------------------------------------------------
   disparar(adelante: Vector3) {
     if (!this.zona || this.recarga > 0 || this.enPregunta) return;
-    this.recarga = 0.45;
+    const a = armaActual();
+    this.recarga = a.recarga;
     const p = this.c.jugador();
-    const vivos = this.bugs.filter((b) => b.vida > 0 && Vector3.Distance(p, b.raiz.position) < 14).sort((a, b) => Vector3.Distance(p, a.raiz.position) - Vector3.Distance(p, b.raiz.position));
-    const triple = (estado.sellos["B6 Bucle for"] ?? 0) > 0;
+    const golpeBug = (b: MiniBug) => {
+      for (let i = 0; i < a.danio && b.vida > 0; i++) this.golpear(b);
+      if (a.aturde && b.vida > 0) b.quietoHasta = this.tiempo + a.aturde;
+    };
+    const golpeJefe = () => {
+      for (let i = 0; i < a.danio; i++) this.golpearJefe();
+    };
     this.c.lanzar();
     sonido.toque();
+    if (a.area) {
+      golpeChampi(this.c.escena, p, a.area);
+      this.c.sacudida.disparar(0.2);
+      for (const b of this.bugs.filter((x) => x.vida > 0 && Vector3.Distance(p, x.raiz.position) < a.area)) golpeBug(b);
+      if (this.jefe && Math.hypot(p.x - this.jefe.raiz.position.x, p.z - this.jefe.raiz.position.z) < a.area + 2) golpeJefe();
+      return;
+    }
+    const vivos = this.bugs.filter((b) => b.vida > 0 && Vector3.Distance(p, b.raiz.position) < a.alcance).sort((x, y) => Vector3.Distance(p, x.raiz.position) - Vector3.Distance(p, y.raiz.position));
+    const triple = (estado.sellos["B6 Bucle for"] ?? 0) > 0;
     const desde = p.add(new Vector3(0, 1.6, 0));
     const objetivos: (MiniBug | "jefe" | null)[] = [];
-    const jefeCerca = this.jefe && Vector3.Distance(p, this.jefe.raiz.position) < 18;
+    const jefeCerca = this.jefe && Vector3.Distance(p, this.jefe.raiz.position) < Math.max(18, a.alcance);
     if (jefeCerca && (!vivos.length || Vector3.Distance(p, vivos[0].raiz.position) > 5)) objetivos.push("jefe");
     for (const b of vivos) if (objetivos.length < (triple ? 3 : 1)) objetivos.push(b);
     if (!objetivos.length) objetivos.push(null);
-    if (triple && objetivos.length > 1) this.flotar(`for i in range(${objetivos.length}): 🎯`);
+    if (triple && objetivos.length > 1) this.flotar(`for i in range(${objetivos.length}): ${a.icono}`);
     objetivos.forEach((o, i) => {
       const hasta = o === "jefe" ? this.jefe!.raiz.position.clone() : o ? o.raiz.position.add(new Vector3(0, 0.4, 0)) : desde.add(adelante.scale(10));
-      window.setTimeout(() => this.piedra(desde, hasta, () => (o === "jefe" ? this.golpearJefe() : o && o.vida > 0 ? this.golpear(o) : undefined)), i * 90);
-    });
-  }
-
-  private piedra(desde: Vector3, hasta: Vector3, alLlegar: () => void) {
-    const piedra = MeshBuilder.CreateSphere("huaraca", { diameter: 0.3, segments: 6 }, this.c.escena);
-    piedra.material = this.ojoMat;
-    let t = 0;
-    const dur = Math.max(0.15, Vector3.Distance(desde, hasta) / 30);
-    const obs = this.c.escena.onBeforeRenderObservable.add(() => {
-      t += this.c.escena.getEngine().getDeltaTime() / 1000 / dur;
-      const k = Math.min(1, t);
-      piedra.position = Vector3.Lerp(desde, hasta, k).add(new Vector3(0, Math.sin(k * Math.PI) * 1.2, 0));
-      if (k >= 1) {
-        this.c.escena.onBeforeRenderObservable.remove(obs);
-        piedra.dispose();
-        alLlegar();
-      }
+      window.setTimeout(() => lanzarProyectil(this.c.escena, desde, hasta, a, () => (o === "jefe" ? golpeJefe() : o && o.vida > 0 ? golpeBug(o) : undefined)), i * 90);
     });
   }
 
@@ -361,7 +363,7 @@ export class ZonaJuego {
       const r = b.raiz;
       const d = Vector3.Distance(p, r.position);
       const vel = TIPOS[b.tipo].velocidad;
-      if (!quieto && d < (b.sitio === "ola" ? 40 : 9) && d > 1.1) r.position.addInPlace(p.subtract(r.position).normalize().scale(vel * dt));
+      if (!quieto && !((b.quietoHasta ?? 0) > this.tiempo) && d < (b.sitio === "ola" ? 40 : 9) && d > 1.1) r.position.addInPlace(p.subtract(r.position).normalize().scale(vel * dt));
       else if (d >= 9 && b.sitio !== "ola") r.position = Vector3.Lerp(r.position, b.casa.add(new Vector3(Math.sin(b.t) * 1.2, 0, Math.cos(b.t) * 1.2)), Math.min(1, dt * 1.5));
       r.position.y = 0.7 + Math.abs(Math.sin(b.t * (b.tipo === "rapido" ? 10 : 6))) * 0.35;
       r.rotation.y = Math.atan2(p.x - r.position.x, p.z - r.position.z);
@@ -403,6 +405,8 @@ export class ZonaJuego {
   }
 
   private dano(n: number) {
+    // Si Chaski saltó o rodó a tiempo, el golpe falla
+    if (esquivoElGolpe()) return;
     this.vida -= n;
     this.c.golpeado();
     this.c.sacudida.disparar(0.25);
@@ -519,6 +523,7 @@ export class ZonaJuego {
     document.getElementById("jefe-zona-nombre")!.textContent = `🐛 ${datos.nombre}`;
     document.getElementById("amenaza")!.hidden = true;
     cambiarMusica("batalla");
+    ponerClima("tormenta");
     this.c.sacudida.disparar(0.8);
     sonido.pututu();
     this.pintarJefe();
@@ -682,6 +687,7 @@ export class ZonaJuego {
     this.alertas = [];
     this.enPregunta = false;
     document.getElementById("jefe-zona")!.hidden = true;
+    ponerClima("sol");
     if (gano && this.zona) cambiarMusica(MUSICA_ZONA[this.zona.id] ?? "andes");
   }
 

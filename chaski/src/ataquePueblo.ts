@@ -2,6 +2,7 @@
 // burbujas de rescate (Mama Khipu y las llamas), la runa de kallpa (responder bien
 // = disparo especial), guardianes en cada reparación y el mini-jefe Ch'aqwa Wawa.
 
+import { esquivoElGolpe } from "./movimiento";
 import { Scene } from "@babylonjs/core/scene";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
@@ -15,6 +16,8 @@ import { sonido, alarma, cambiarMusica, musicaSuave } from "./sonido";
 import { tarjeta, cerrarTarjeta } from "./ui/prologo";
 import { hablar } from "./ui/dialogo";
 import { Jefe } from "./batalla";
+import { armaActual, lanzarProyectil, golpeChampi } from "./armas";
+import { ponerClima, rayo } from "./clima";
 import { RUNAS_PUEBLO, RUNAS_WAWA, ALARMA_INTRO, OLA_GANADA, WAWA_LLEGA, WAWA_VENCIDO, type PreguntaRuna } from "./datos/ataquePueblo";
 
 const escapar = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
@@ -41,6 +44,8 @@ interface Contexto {
   cambio: () => void;
   /** Liberaron a Mama: main sigue la historia. */
   mamaLibre: () => void;
+  /** Llega Waman, el chaski, tocando el pututo. Devuelve cómo despedirlo. */
+  chaskiAlarma?: () => Promise<() => void>;
 }
 
 interface MiniBug {
@@ -52,6 +57,7 @@ interface MiniBug {
   /** Guardianes: se quedan cerca de su casa. Ola: van a la fuente. */
   casa: Vector3 | null;
   guardia: string | null;
+  quietoHasta?: number;
 }
 
 interface Burbuja {
@@ -112,11 +118,13 @@ export class AtaquePueblo {
   // ---------------------------------------------------------------------------
   // Estado de la historia
   // ---------------------------------------------------------------------------
+  // Solo en el paso "intro" hay oleada y Mama atrapada. Las partidas guardadas en versiones
+  // anteriores (que ya pasaron el intro) siguen sin quedarse trabadas.
   get olaHecha() {
-    return estado.pueblo.ola || yaPaso("hablar1");
+    return estado.pueblo.ola || estado.paso !== "intro";
   }
   get mamaAtrapada() {
-    return !(estado.pueblo.mama || yaPaso("hablar1"));
+    return estado.paso === "intro" && !estado.pueblo.mama;
   }
   get jefeActivo() {
     return this.modo === "jefe";
@@ -177,6 +185,7 @@ export class AtaquePueblo {
 
   salir() {
     this.activo = false;
+    ponerClima("sol");
     this.limpiarTodo();
   }
 
@@ -206,13 +215,19 @@ export class AtaquePueblo {
       if (this.mamaAtrapada && this.activo) this.modoMama();
       return;
     }
-    if (conDialogo) await hablar(ALARMA_INTRO);
+    if (conDialogo) {
+      const vete = (await this.c.chaskiAlarma?.().catch(() => null)) ?? null;
+      ponerClima("nublado");
+      await hablar(ALARMA_INTRO);
+      vete?.();
+    }
     this.modo = "ola";
     this.amenaza = TIEMPO_OLA;
     this.olaDos = false;
     this.vida = 100;
     for (let i = 0; i < 4; i++) this.ponerBug(ENTRADAS[i], false, null, null);
     cambiarMusica("batalla");
+    ponerClima("lluvia");
     sonido.pututu();
     this.c.sacudida.disparar(0.5);
     this.c.objetivo("¡Defiende la fuente! Dispara a los mini-Bugs con 🎯 HUARACA");
@@ -277,25 +292,43 @@ export class AtaquePueblo {
   // ---------------------------------------------------------------------------
   disparar(adelante: Vector3) {
     if (!this.activo || this.recarga > 0 || this.preguntando) return;
-    this.recarga = 0.4;
+    const a = armaActual();
+    this.recarga = a.recarga;
     const p = this.c.jugador();
+    const golpeBug = (b: MiniBug) => {
+      for (let i = 0; i < a.danio && b.vida > 0; i++) this.golpearBug(b);
+      if (a.aturde && b.vida > 0) b.quietoHasta = this.tiempo + a.aturde;
+    };
+    const golpeJefe = () => {
+      for (let i = 0; i < a.danio; i++) this.golpearJefe();
+    };
+    this.c.lanzar();
+    sonido.toque();
+    if (a.area) {
+      golpeChampi(this.c.escena, p, a.area);
+      this.c.sacudida.disparar(0.2);
+      for (const b of this.bugs.filter((x) => x.vida > 0 && Vector3.Distance(p, x.raiz.position) < a.area)) golpeBug(b);
+      if (this.jefe && Math.hypot(p.x - this.jefe.raiz.position.x, p.z - this.jefe.raiz.position.z) < a.area + 1.5) golpeJefe();
+      for (const b of this.burbujas.filter((x) => x.id !== "mama" && Vector3.Distance(p, x.malla.position) < a.area + 1.2)) for (let i = 0; i < a.danio; i++) this.golpearBurbuja(b);
+      return;
+    }
     // Prioridad: el Bug más cercano; si no hay, el jefe; si no, una burbuja de vecino.
     let objetivo: { pos: Vector3; golpe: () => void } | null = null;
-    let mejor = 15;
+    let mejor = a.alcance;
     for (const b of this.bugs) {
       if (b.vida <= 0) continue;
       const d = Vector3.Distance(p, b.raiz.position);
       if (d < mejor) {
         mejor = d;
-        objetivo = { pos: b.raiz.position, golpe: () => this.golpearBug(b) };
+        objetivo = { pos: b.raiz.position, golpe: () => golpeBug(b) };
       }
     }
-    if (!objetivo && this.jefe && Vector3.Distance(p, this.jefe.raiz.position) < 18) {
+    if (!objetivo && this.jefe && Vector3.Distance(p, this.jefe.raiz.position) < Math.max(18, a.alcance)) {
       const j = this.jefe;
-      objetivo = { pos: j.raiz.position, golpe: () => this.golpearJefe() };
+      objetivo = { pos: j.raiz.position, golpe: golpeJefe };
     }
     if (!objetivo) {
-      mejor = 14;
+      mejor = Math.min(14, a.alcance);
       for (const b of this.burbujas) {
         if (b.id === "mama") continue;
         const d = Vector3.Distance(p, b.malla.position);
@@ -305,24 +338,9 @@ export class AtaquePueblo {
         }
       }
     }
-    this.c.lanzar();
-    sonido.toque();
     const desde = p.add(new Vector3(0, 1.6, 0));
     const hasta = objetivo ? objetivo.pos.add(new Vector3(0, 0.4, 0)) : desde.add(adelante.scale(10));
-    const piedra = MeshBuilder.CreateSphere("huaraca", { diameter: 0.3, segments: 6 }, this.c.escena);
-    piedra.material = this.piedraMat;
-    let t = 0;
-    const dur = Math.max(0.15, Vector3.Distance(desde, hasta) / 30);
-    const obs = this.c.escena.onBeforeRenderObservable.add(() => {
-      t += this.c.escena.getEngine().getDeltaTime() / 1000 / dur;
-      const k = Math.min(1, t);
-      piedra.position = Vector3.Lerp(desde, hasta, k).add(new Vector3(0, Math.sin(k * Math.PI) * 1.2, 0));
-      if (k >= 1) {
-        this.c.escena.onBeforeRenderObservable.remove(obs);
-        piedra.dispose();
-        objetivo?.golpe();
-      }
-    });
+    lanzarProyectil(this.c.escena, desde, hasta, a, () => objetivo?.golpe());
   }
 
   private golpearBug(b: MiniBug) {
@@ -404,6 +422,7 @@ export class AtaquePueblo {
       // Segunda oleada, con un Bug grande
       this.olaDos = true;
       this.c.aviso("⚠ ¡Viene otra oleada! Y trae un mini-Bug GRANDE…", 2500);
+      ponerClima("tormenta");
       alarma();
       window.setTimeout(() => {
         if (this.modo !== "ola") return;
@@ -417,6 +436,7 @@ export class AtaquePueblo {
     estado.pueblo.ola = true;
     guardar();
     cambiarMusica("andes");
+    ponerClima("sol");
     this.c.ganarKallpa(10);
     this.c.festejar();
     this.c.desbloquear("defensa");
@@ -434,6 +454,7 @@ export class AtaquePueblo {
     }
     this.bugs = [];
     alarma();
+    rayo();
     this.c.sacudida.disparar(0.9);
     this.c.golpeado();
     document.body.classList.remove("golpe");
@@ -533,6 +554,7 @@ export class AtaquePueblo {
     document.getElementById("jefe-zona")!.hidden = false;
     document.getElementById("jefe-zona-nombre")!.textContent = "🐛 Ch'aqwa Wawa";
     cambiarMusica("batalla");
+    ponerClima("tormenta");
     sonido.pututu();
     this.c.sacudida.disparar(0.8);
     this.c.objetivo("¡Vence al Ch'aqwa Wawa! Toca la 🔮 runa para romper su escudo");
@@ -597,6 +619,7 @@ export class AtaquePueblo {
     guardar();
     this.modo = "nada";
     cambiarMusica("andes");
+    ponerClima("sol");
     this.c.ganarKallpa(15);
     this.c.festejar();
     this.c.desbloquear("wawa");
@@ -657,7 +680,7 @@ export class AtaquePueblo {
       b.t += dt;
       const r = b.raiz;
       const d = Vector3.Distance(p, r.position);
-      if (!quieto) {
+      if (!quieto && !((b.quietoHasta ?? 0) > this.tiempo)) {
         let meta: Vector3;
         const vel = b.grande ? 1.6 : 2.3;
         if (d < (b.guardia ? 8 : 5.5)) meta = p; // te ven: te persiguen
@@ -754,6 +777,8 @@ export class AtaquePueblo {
   }
 
   private dano(n: number) {
+    // Si Chaski saltó o rodó a tiempo, el golpe falla
+    if (esquivoElGolpe()) return;
     this.vida -= n;
     this.c.golpeado();
     this.c.sacudida.disparar(0.25);

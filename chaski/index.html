@@ -50,6 +50,7 @@
       <span class="chip" id="chip-kallpa" title="Kallpa (fuerza)">⚡ <b id="hud-kallpa">0</b></span>
       <button class="chip" id="chip-simi" title="Simi Qillqa: palabras, nudos e insignias">📖 <b id="hud-palabras">0</b></button>
       <button class="chip" id="chip-misiones" title="Misiones" hidden>📜</button>
+      <button class="chip" id="chip-armas" title="Armería: forja armas con código" hidden>⚔</button>
       <button class="chip" id="chip-mapa" title="Mapa del Perú (M)" hidden>🗺</button>
       <button class="chip boton-ajustes" id="boton-ajustes" aria-label="Ajustes">⚙</button>
     </div>
@@ -91,6 +92,7 @@
       <button data-camara="lejos">Lejos</button>
     </div>
     <button class="boton-secundario" id="boton-sonido">🔊 Sonido: sí</button>
+    <button class="boton-secundario" id="boton-musica">🎵 Música: sí</button>
     <button class="boton-secundario" id="boton-voz">🗣 Voz que lee: no</button>
     <button class="boton-secundario" id="boton-pantalla">⛶ Pantalla completa</button>
     <button class="boton-secundario peligro" id="boton-reiniciar">↺ Empezar de nuevo</button>
@@ -114,9 +116,14 @@
 
   <div id="zona-joystick"></div>
   <div id="joystick"><div id="perilla"></div></div>
+  <div class="botones-mover" id="botones-mover" hidden>
+    <button id="boton-esquivar" class="boton-redondo esquivar" title="Esquivar (X)">💨<br>ESQUIVA</button>
+    <button id="boton-saltar" class="boton-redondo saltar" title="Saltar (Espacio)">⤴<br>SALTA</button>
+  </div>
   <div class="botones-accion" id="botones-accion" hidden>
     <button id="boton-rescatar" class="boton-redondo rescatar" hidden>🔧<br>RESCATAR</button>
     <button id="boton-hablar" class="boton-redondo hablar" hidden>💬<br>HABLAR</button>
+    <button id="boton-arma" class="boton-redondo cambiar-arma" hidden title="Cambiar arma">🔄</button>
     <button id="boton-huaraca" class="boton-redondo huaraca" hidden>🎯<br>HUARACA</button>
     <button id="boton-runa" class="boton-redondo runa" hidden>🔮<br>RUNA</button>
     <button id="boton-taller" class="boton-redondo taller" hidden>📜<br>TALLER</button>

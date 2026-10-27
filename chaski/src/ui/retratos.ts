@@ -68,6 +68,17 @@ const RETRATOS: Record<string, string> = {
     <circle cx="42" cy="42" r="4" fill="#161616"/><circle cx="58" cy="42" r="4" fill="#161616"/>
     <ellipse cx="50" cy="56" rx="9" ry="6" fill="#e8dcc6"/><path d="M46 57 Q50 60 54 57" stroke="#5a3a2a" stroke-width="2" fill="none"/>
     <rect x="30" y="80" width="40" height="8" fill="#c8102e"/>`,
+  waman: `
+    <circle cx="50" cy="50" r="50" fill="#1f6f6a"/>
+    <path d="M10 100 Q50 70 90 100Z" fill="#f2efe6"/>
+    <path d="M30 100 L40 76 L50 84 L60 76 L70 100Z" fill="#c8102e"/>
+    <circle cx="50" cy="56" r="24" fill="#a8744a"/>
+    <path d="M26 48 Q50 30 74 48 L74 42 Q50 26 26 42Z" fill="#1c1410"/>
+    <rect x="26" y="40" width="48" height="6" fill="#f2efe6"/>
+    <path d="M50 40 L46 10 L52 14 L56 4 L58 40Z" fill="#ffffff" stroke="#ddd"/>
+    <circle cx="42" cy="58" r="3.4" fill="#2a1a12"/><circle cx="58" cy="58" r="3.4" fill="#2a1a12"/>
+    <path d="M43 68 Q50 73 57 68" stroke="#7a2318" stroke-width="2.5" fill="none"/>
+    <path d="M66 70 Q84 64 86 78 Q80 82 70 78Z" fill="#f4e6d6" stroke="#c9a88a"/>`,
   sisa: `
     <circle cx="50" cy="50" r="50" fill="#5d7a3a"/>
     <path d="M10 100 Q50 70 90 100Z" fill="#8a7a4a"/>

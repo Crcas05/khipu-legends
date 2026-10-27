@@ -1,6 +1,7 @@
 // La jugabilidad del Valle Sagrado: mini-Bugs, huaraca (honda andina), rescates
 // con código, inventario (un diccionario de Python), mapa y progreso.
 
+import { esquivoElGolpe } from "./movimiento";
 import { Scene } from "@babylonjs/core/scene";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
@@ -16,6 +17,7 @@ import { sonido } from "./sonido";
 import { tarjeta, voz, teoria, elegir, esperarBoton, cerrarTarjeta } from "./ui/prologo";
 import { abrirBloques } from "./ui/bloques";
 import { abrirTaller } from "./ui/taller";
+import { armaActual, lanzarProyectil, golpeChampi } from "./armas";
 
 const ORDEN_SITIOS: Sitio[] = ["vicuna", "rio", "quenua", "condor", "colibri", "puerta"];
 const MATERIALES = ["piedra", "ichu", "adobe"];
@@ -136,10 +138,22 @@ export class ValleJuego {
   // ---------------------------------------------------------------------------
   disparar(adelante: Vector3) {
     if (!this.activo || this.recarga > 0) return;
-    this.recarga = 0.45;
+    const a = armaActual();
+    this.recarga = a.recarga;
     const p = this.c.jugador();
+    const golpe = (b: MiniBug) => {
+      for (let i = 0; i < a.danio && b.vida > 0; i++) this.golpearBug(b);
+    };
+    this.c.lanzar();
+    sonido.toque();
+    if (a.area) {
+      golpeChampi(this.c.escena, p, a.area);
+      this.c.sacudida.disparar(0.2);
+      for (const b of this.bugs.filter((x) => x.vida > 0 && Vector3.Distance(p, x.raiz.position) < a.area)) golpe(b);
+      return;
+    }
     let objetivo: MiniBug | null = null;
-    let mejor = 14;
+    let mejor = a.alcance;
     for (const b of this.bugs) {
       if (b.vida <= 0) continue;
       const d = Vector3.Distance(p, b.raiz.position);
@@ -148,23 +162,10 @@ export class ValleJuego {
         objetivo = b;
       }
     }
-    this.c.lanzar();
-    sonido.toque();
     const desde = p.add(new Vector3(0, 1.6, 0));
     const hasta = objetivo ? objetivo.raiz.position.add(new Vector3(0, 0.4, 0)) : desde.add(adelante.scale(10));
-    const piedra = MeshBuilder.CreateSphere("huaraca", { diameter: 0.3, segments: 6 }, this.c.escena);
-    piedra.material = this.ojoMat;
-    let t = 0;
-    const dur = Math.max(0.15, Vector3.Distance(desde, hasta) / 30);
-    const obs = this.c.escena.onBeforeRenderObservable.add(() => {
-      t += this.c.escena.getEngine().getDeltaTime() / 1000 / dur;
-      const k = Math.min(1, t);
-      piedra.position = Vector3.Lerp(desde, hasta, k).add(new Vector3(0, Math.sin(k * Math.PI) * 1.2, 0));
-      if (k >= 1) {
-        this.c.escena.onBeforeRenderObservable.remove(obs);
-        piedra.dispose();
-        if (objetivo && objetivo.vida > 0) this.golpearBug(objetivo);
-      }
+    lanzarProyectil(this.c.escena, desde, hasta, a, () => {
+      if (objetivo && objetivo.vida > 0) golpe(objetivo);
     });
   }
 
@@ -211,7 +212,7 @@ export class ValleJuego {
       r.rotation.y = Math.atan2(p.x - r.position.x, p.z - r.position.z);
       r.scaling.setAll(this.tiempo < b.golpeHasta ? 1.3 : 1);
       // Muerde si está pegado
-      if (!pausado && d < 1.4 && Math.floor(b.t / 0.9) !== Math.floor((b.t - dt) / 0.9)) {
+      if (!pausado && d < 1.4 && Math.floor(b.t / 0.9) !== Math.floor((b.t - dt) / 0.9) && !esquivoElGolpe()) {
         this.vida -= 7;
         this.c.golpeado();
         this.c.sacudida.disparar(0.25);

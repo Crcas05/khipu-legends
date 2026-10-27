@@ -43,6 +43,10 @@ import { ZonaJuego } from "./zonaJuego";
 import { AtaquePueblo } from "./ataquePueblo";
 import { poblar } from "./paisaje";
 import { crearSol } from "./terreno";
+import { Clima, registrarClima, ponerClima } from "./clima";
+import { ARMAS, armaActual, siguienteArma, desbloqueadas } from "./armas";
+import { abrirArmeria } from "./ui/armeria";
+import { llegaChaskiCorredor } from "./mensajero";
 import { MisionJuego, LIMITE_MISION, INICIO_MISION } from "./misionJuego";
 import { MISIONES, type Mision } from "./datos/misiones";
 import { tarjetaMision, resultadoMision, listaMisiones } from "./ui/misionUI";
@@ -56,10 +60,11 @@ import { INTRO_VALLE, FIN_VALLE, APRENDIDO_VALLE, codigoSitio, NOMBRE_SITIO } fr
 import { abrirBloques } from "./ui/bloques";
 import { BLOQUES_2, LLEGADA, AMARU_1, ECOS_LISTOS, ANTES_BATALLA, VICTORIA, APRENDIDO_2, RETO_RAYO } from "./datos/episodio2";
 import { desbloquear, abrirSimiQillqa, TOTAL_NUDOS } from "./ui/logros";
-import { sonido, despertarAudio, iniciarMusica, alternarSilencio, estaSilenciado, cambiarMusica } from "./sonido";
+import { sonido, despertarAudio, iniciarMusica, alternarSilencio, estaSilenciado, cambiarMusica, alternarMusica, musicaApagada } from "./sonido";
 import { crearModelo, ponerChullo, ponerMontera } from "./modelos";
 import { crearChorro, estallido, crearPolvo, crearDestello, Sacudida } from "./efectos";
 import type { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
+import { saltar as iniciarSalto, empezarEsquive, esquivando, actualizarSalto, puedeEsquivar, enElAire, invulnerable } from "./movimiento";
 
 type Calidad = "bajo" | "medio" | "alto";
 const VELOCIDAD = 5.4;
@@ -241,6 +246,8 @@ escudo.setEnabled(false);
 const chorro = crearChorro(escena, new Vector3(0, 2.2, 0));
 const polvo = crearPolvo(escena, chaski.raiz.position);
 const sacudida = new Sacudida();
+const clima = new Clima(escena, camara, cielo, sol, (f) => sacudida.disparar(f));
+registrarClima(clima);
 
 // Secretos de level design: 3 nudos dorados que solo se ven con el Ojo
 const NUDOS = [new Vector3(15.5, 1, -14.5), new Vector3(7, 1, 22.5), new Vector3(-19, 1, -7)];
@@ -569,6 +576,7 @@ async function hablarConMama() {
         desbloquear("episodio1");
         chaski.festejar();
         await nuevoNivel(APRENDIDO);
+        avisarArmas();
         window.setTimeout(() => void siguienteMensaje(), 1800);
         break;
       case "taller":
@@ -616,6 +624,7 @@ async function viajarA(destino: Region) {
   velo.classList.add("cubre");
   await new Promise((r) => window.setTimeout(r, 450));
   if (ojoAbierto) alternarOjo(false);
+  clima.forzarSol();
   if (region === "valle") valleJuego.salir();
   if (region === "plaza" && destino !== "plaza") ataque.salir();
   if (region === "mision") misionJuego.salir();
@@ -812,7 +821,7 @@ const batalla = new Batalla({
   escena,
   jefe,
   jugador: () => chaski.raiz.position,
-  animar: (a) => (a === "lanzar" ? chaski.lanzar() : chaski.golpeado()),
+  animar: (a) => (a === "lanzar" ? chaski.hechizo() : chaski.golpeado()),
   escudo: (a) => escudo.setEnabled(a),
   festejar: () => chaski.festejar(),
   sacudida,
@@ -828,10 +837,12 @@ const batalla = new Batalla({
 function empezarBatalla() {
   actualizarBotones();
   cambiarMusica("batalla");
+  ponerClima("tormenta");
   aviso("¡Usa tus cartas Q, W, E! Esquiva el suelo rojo.", 3500);
   batalla.iniciar().then(() =>
     enCalma(async () => {
       cambiarMusica("selva");
+      ponerClima("sol");
       desbloquear("jefe");
       ganarKallpa(25);
       avanzar("victoria");
@@ -862,6 +873,46 @@ const ataque = new AtaquePueblo({
   desbloquear,
   objetivo: (t) => fijarObjetivo(t),
   cambio: () => actualizarBotones(),
+  chaskiAlarma: async () => {
+    const c = await llegaChaskiCorredor(escena, chaski.raiz.position, async () => {
+      const corredor = new Chaski(escena, true);
+      try {
+        const m = await crearModelo(escena, "chaski.glb", corredor.raiz, 2.6);
+        // Waman: vincha blanca con un penacho de plumas (así iban los chaskis) y su pututo
+        const extras: Mesh[] = [];
+        if (m.cabeza) {
+          const blanco = material(escena, "#f7f4ec");
+          const vincha = MeshBuilder.CreateTorus("vincha", { diameter: 0.95, thickness: 0.12, tessellation: 20 }, escena);
+          vincha.material = blanco;
+          vincha.parent = m.cabeza;
+          vincha.position.y = 0.5;
+          extras.push(vincha);
+          for (let i = -1; i <= 1; i++) {
+            const pluma = MeshBuilder.CreateCylinder("pluma", { height: 0.7, diameterTop: 0.02, diameterBottom: 0.16, tessellation: 6 }, escena);
+            pluma.material = blanco;
+            pluma.parent = m.cabeza;
+            pluma.position.set(i * 0.12, 0.92, -0.05);
+            pluma.rotation.z = -i * 0.3;
+            extras.push(pluma);
+          }
+        }
+        corredor.vestir(m, extras);
+        for (const malla of m.mallas) {
+          if (malla.material instanceof StandardMaterial) {
+            const t = malla.material.clone(`${malla.material.name}-waman`);
+            t.diffuseColor = new Color3(0.75, 0.95, 0.9);
+            malla.material = t;
+          }
+        }
+      } catch {
+        /* queda con formas simples */
+      }
+      return { raiz: corredor.raiz, mover: (dx: number, dz: number, dt: number) => corredor.actualizar(dx, dz, dt) };
+    });
+    aviso("📯 ¡Se escucha un pututo! Un chaski viene corriendo por el camino…", 3000);
+    await c.llega;
+    return c.vete;
+  },
   mamaLibre: () => {
     if (estado.paso === "intro") avanzar("hablar1");
     window.setTimeout(() => void hablarConMama(), 700);
@@ -1097,10 +1148,12 @@ async function terminarMision(r: { ganado: boolean; errores: number; golpes: num
   ganarKallpa(m.recompensa);
   desbloquear(m.logro);
   if (n === 3) desbloquear("tres-estrellas");
+  cambiarMusica(m.ambiente === "puna" ? "altiplano" : m.ambiente === "selva" ? "selva" : "andes", true);
   const eleccion = await resultadoMision(m, n, r.errores, r.golpes);
   if (eleccion === "repetir") await viajarA("mision");
   else {
     await viajarA("plaza");
+    avisarArmas();
     window.setTimeout(() => void siguienteMensaje(), 2500);
   }
 }
@@ -1108,6 +1161,15 @@ async function terminarMision(r: { ganado: boolean; errores: number; golpes: num
 // ---------------------------------------------------------------------------
 // LA HISTORIA LLEGA SOLA: Mama Khipu camina hacia Chaski; cóndor y guacamayo traen misiones
 // ---------------------------------------------------------------------------
+/** Si hay un arma nueva para forjar, lo dice (una vez por arma). */
+function avisarArmas() {
+  const nueva = ARMAS.find((a) => a.reto && a.disponible() && !estado.armas.includes(a.id) && !estado.ayudas.includes(`aviso-${a.id}`));
+  if (!nueva) return;
+  estado.ayudas.push(`aviso-${nueva.id}`);
+  guardar();
+  window.setTimeout(() => aviso(`⚒ ¡Nueva arma! Toca ⚔ (arriba) y forja ${nueva.icono} ${nueva.nombre} con una runa de Python.`, 4500), 900);
+}
+
 let mensajeEnCurso = false;
 /** Trae (con un ave mensajera) la siguiente misión pendiente; si ya no hay, el aviso de la selva. */
 async function siguienteMensaje() {
@@ -1308,8 +1370,13 @@ function actualizarBotones() {
   $("boton-rescatar").innerHTML = liberar ? "🫧<br>LIBERAR" : region === "zona" ? "📘<br>APRENDER" : "🔧<br>RESCATAR";
   $("chip-mapa").hidden = !yaPaso("victoria") || batalla.activa;
   $("chip-misiones").hidden = !llego("completo") || batalla.activa || region === "mision";
+  $("chip-armas").hidden = !llego("completo") || batalla.activa;
+  const arma = armaActual();
+  $("boton-huaraca").innerHTML = `${arma.icono}<br>${arma.nombre.toUpperCase()}`;
+  $("boton-arma").hidden = $("boton-huaraca").hidden || desbloqueadas().length < 2;
   $("boton-taller").hidden = !(["taller", "final", "completo", "forja", "batalla", "victoria", "completo2"].includes(estado.paso)) || batalla.activa;
   $("boton-accion").hidden = !yaPaso("hablar1");
+  $("botones-mover").hidden = !jugando || batalla.activa || misionJuego.enDuelo;
   const avisar = ["hablar1", "hablar2", "final"].includes(estado.paso);
   marcador.isVisible = avisar;
   // Manito 👆 la primera vez que aparece cada botón
@@ -1320,6 +1387,8 @@ function actualizarBotones() {
       ["boton-rescatar", region === "zona" ? "¡Aprende aquí!" : "¡Rescata este lugar!"],
       ["boton-huaraca", "¡Dispara a los Bugs!"],
       ["boton-accion", "Mira el mundo como código"],
+      ["boton-saltar", "¡Salta! Los golpes fallan en el aire"],
+      ["boton-esquivar", "Rueda para esquivar ataques"],
       ["boton-taller", "Escribe tus runas"],
       ["chip-mapa", "Mapa del viaje"],
     ];
@@ -1375,6 +1444,19 @@ $("boton-huaraca").addEventListener("pointerdown", (e) => {
   else if (region === "zona") zonaJuego.disparar(adelanteDeChaski());
   else valleJuego.disparar(adelanteDeChaski());
 });
+$("boton-arma").addEventListener("click", () => {
+  const a = siguienteArma();
+  sonido.toque();
+  aviso(`${a.icono} ${a.nombre}: ${a.como}`, 2000);
+  actualizarBotones();
+});
+$("chip-armas").addEventListener("click", () => {
+  sonido.toque();
+  void enCalma(async () => {
+    const a = await abrirArmeria();
+    if (a) aviso(`${a.icono} ¡${a.nombre} forjado con tu código! ${a.como}`, 3500);
+  });
+});
 $("chip-misiones").addEventListener("click", () => {
   sonido.toque();
   void enCalma(async () => {
@@ -1423,6 +1505,13 @@ $("boton-sonido").addEventListener("click", () => {
   pintarSonido();
 });
 $("boton-ajustes").addEventListener("click", () => ($("ajustes").hidden = !$("ajustes").hidden));
+const pintarMusica = () => ($("boton-musica").textContent = musicaApagada() ? "🎵 Música: no" : "🎵 Música: sí");
+pintarMusica();
+$("boton-musica").addEventListener("click", () => {
+  despertarAudio();
+  alternarMusica();
+  pintarMusica();
+});
 const pintarVoz = () => {
   $("boton-voz").textContent = estado.voz ? "🗣 Voz que lee: sí" : "🗣 Voz que lee: no";
   $("boton-voz").hidden = !hayVoz();
@@ -1492,16 +1581,89 @@ function confirmarDoble(b: HTMLButtonElement): boolean {
 }
 
 const teclas = new Set<string>();
+// ---------------------------------------------------------------------------
+// Saltar, esquivar (rodar) y correr — movimiento de acción
+// ---------------------------------------------------------------------------
+let dirEsquive = { x: 0, z: 1 };
+let estabaEnAire = false;
+const puedeMoverse = () =>
+  jugando && !ocupado && !dialogoAbierto() && !batalla.activa && !zonaJuego.preguntando && !ataque.preguntando && !misionJuego.enDuelo;
+
+function accionSaltar() {
+  if (!puedeMoverse() || !iniciarSalto()) return;
+  const corriendo = teclas.has("shift") || Math.hypot(entrada.x, entrada.y) > 0.92;
+  chaski.saltar(corriendo);
+  sonido.salto();
+}
+
+function accionEsquivar() {
+  if (!puedeMoverse() || !puedeEsquivar()) return;
+  // Esquiva hacia donde empuja el jugador; si está quieto, hacia atrás (retrocede ante el ataque)
+  let x = entrada.x;
+  let z = -entrada.y;
+  if (teclas.has("arrowleft") || teclas.has("a")) x = -1;
+  if (teclas.has("arrowright") || teclas.has("d")) x = 1;
+  if (teclas.has("arrowup") || teclas.has("w")) z = 1;
+  if (teclas.has("arrowdown") || teclas.has("s")) z = -1;
+  let largo = Math.hypot(x, z);
+  const mira = chaski.mirada;
+  const fx = Math.sin(mira);
+  const fz = Math.cos(mira);
+  let lado = 0;
+  if (largo < 0.1) {
+    x = -fx;
+    z = -fz;
+    largo = 1;
+    lado = Math.random() < 0.5 ? -1 : 1;
+  } else {
+    // ¿Hacia qué lado respecto a donde mira? (producto cruz y punto)
+    const cruz = fx * z - fz * x;
+    const punto = fx * x + fz * z;
+    lado = punto > 0.6 ? 0 : cruz > 0 ? -1 : 1;
+  }
+  if (!empezarEsquive()) return;
+  dirEsquive = { x: x / largo, z: z / largo };
+  chaski.esquivar(lado);
+  sonido.esquive();
+  estallido(escena, chaski.raiz.position.add(new Vector3(0, 0.2, 0)), ["#c9a77a", "#e8d5b0"], 16, 2);
+  const b = $("boton-esquivar");
+  b.classList.add("recargando");
+  window.setTimeout(() => b.classList.remove("recargando"), 900);
+}
+
+for (const [id, f] of [["boton-saltar", accionSaltar], ["boton-esquivar", accionEsquivar]] as const) {
+  const b = $(id);
+  b.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    b.classList.add("presionado");
+    f();
+  });
+  const soltar = () => b.classList.remove("presionado");
+  b.addEventListener("pointerup", soltar);
+  b.addEventListener("pointerleave", soltar);
+}
+
 window.addEventListener("keydown", (e) => {
   if ((e.target as HTMLElement).closest("textarea, input")) return;
   const k = e.key.toLowerCase();
   teclas.add(k);
+  if (k === " " && puedeMoverse()) {
+    e.preventDefault();
+    accionSaltar();
+  }
+  if ((k === "x" || k === "control") && puedeMoverse()) accionEsquivar();
   if (!jugando || ocupado || dialogoAbierto() || batalla.activa) return;
   if (k === "o") alternarOjo();
   if (k === "e" && cercaDeMama && !(region === "plaza" && ataque.mamaAtrapada)) hablarConMama();
   if (k === "e" && region === "plaza" && liberable) ataque.liberarMama();
   if (k === "t" && !$("boton-taller").hidden) enCalma(usarTaller);
   if (k === "q") enCalma(abrirSimiQillqa);
+  if (k === "c" && desbloqueadas().length > 1) {
+    const a = siguienteArma();
+    aviso(`${a.icono} ${a.nombre}`, 1200);
+    actualizarBotones();
+  }
   if (k === "f" && region === "plaza") ataque.disparar(adelanteDeChaski());
   if (k === "f" && region === "mision") misionJuego.disparar(adelanteDeChaski());
   if (k === "r" && region === "plaza") void ataque.usarRuna();
@@ -1563,9 +1725,28 @@ escena.onBeforeRenderObservable.add(() => {
     dx /= largo;
     dz /= largo;
   }
+  // Correr: Shift en PC, o el joystick empujado hasta el borde en el celular
+  const sprint = !bloqueado && largo > 0.1 && (teclas.has("shift") || Math.hypot(entrada.x, entrada.y) > 0.92);
   const pos = chaski.raiz.position;
-  pos.x += dx * VELOCIDAD * dt;
-  pos.z += dz * VELOCIDAD * dt;
+  const rodando = esquivando();
+  if (rodando) {
+    // La rodada empuja rápido (~5 pasos) aunque el jugador suelte el control
+    pos.x += dirEsquive.x * 11.5 * dt;
+    pos.z += dirEsquive.z * 11.5 * dt;
+  } else {
+    // En el aire se conserva algo del impulso, como en el mundo real
+    const v = VELOCIDAD * (sprint ? 1.45 : 1) * (enElAire() && largo < 0.1 ? 0 : 1);
+    pos.x += dx * v * dt;
+    pos.z += dz * v * dt;
+  }
+  // Salto con gravedad
+  const altura = actualizarSalto(dt);
+  pos.y = altura;
+  if (estabaEnAire && altura === 0) {
+    sonido.aterrizar();
+    estallido(escena, pos.add(new Vector3(0, 0.1, 0)), ["#c9a77a", "#e8d5b0"], 14, 1.6);
+  }
+  estabaEnAire = altura > 0;
   resolverChoques(
     pos,
     region === "selva" ? selva.choques : region === "valle" ? valle.choques : region === "zona" ? zonaJuego.mundo?.choques ?? [] : region === "mision" ? misionJuego.choques : mundo.choques,
@@ -1633,7 +1814,7 @@ escena.onBeforeRenderObservable.add(() => {
     } else esperaJefe = 0;
   }
   batalla.actualizar(dt);
-  chaski.actualizar(dx, dz, dt);
+  chaski.actualizar(dx, dz, dt, sprint, !rodando);
   tuki.seguir(chaski.raiz, dt);
   mama.actualizar(dt);
   if (jugando && region === "plaza") mirarSuave(mama.raiz, chaski.raiz.position, dt, 7);
@@ -1670,11 +1851,18 @@ escena.onBeforeRenderObservable.add(() => {
       camara.targetScreenOffset.y += ((vert ? 3 : -0.8) - camara.targetScreenOffset.y) * Math.min(1, dt * 3);
     } else camara.targetScreenOffset.scaleInPlace(1 - Math.min(1, dt * 4));
     camara.beta += ((misionJuego.enDuelo ? 1.12 : betaBase) - camara.beta) * Math.min(1, dt * 4);
-    camara.target.copyFrom(Vector3.Lerp(camara.target, pos.add(new Vector3(0, 1.2, 0)), Math.min(1, dt * 6)).add(sacudida.tomar(dt)));
+    camara.target.copyFrom(Vector3.Lerp(camara.target, new Vector3(pos.x, 1.2 + pos.y * 0.25, pos.z), Math.min(1, dt * 6)).add(sacudida.tomar(dt)));
     // Cámara de cine: se acerca durante los diálogos
     // En lugares cerrados (selva, templo) la cámara no se aleja tanto: si no, queda dentro de los árboles
     const tope = region === "mision" ? (misionActual?.ambiente === "selva" ? 15 : misionActual?.ambiente === "templo" ? 21 : 30) : region === "selva" ? 19 : 60;
-    const radioObjetivo = misionJuego.enDuelo ? 12 : Math.min(tope, dialogoAbierto() ? radioBase * 0.72 : radioBase);
+    let radioObjetivo = misionJuego.enDuelo ? 12 : Math.min(tope, dialogoAbierto() ? radioBase * 0.72 : radioBase);
+    // Que la cámara no se meta dentro de los cerros del borde: se acerca si Chaski está cerca del límite
+    const borde = region === "plaza" ? 40 : region === "selva" ? 38 : region === "mision" ? (misionActual?.ambiente === "puna" ? 32 : misionActual?.ambiente === "selva" ? 30 : 34) : 0;
+    if (borde) {
+      const sb = Math.sin(camara.beta);
+      const disc = borde * borde - camara.target.x * camara.target.x;
+      if (disc > 0 && sb > 0.1) radioObjetivo = Math.max(9, Math.min(radioObjetivo, (camara.target.z + Math.sqrt(disc)) / sb));
+    }
     camara.radius += (radioObjetivo - camara.radius) * Math.min(1, dt * 3);
   }
   // Flecha guía
@@ -1890,7 +2078,16 @@ async function empezar() {
   $("hud").hidden = false;
   pintarLugar();
   $("botones-accion").hidden = false;
+  $("botones-mover").hidden = false;
   document.body.classList.add("en-juego");
+  try {
+    if (!localStorage.getItem("chaski-movimientos")) {
+      localStorage.setItem("chaski-movimientos", "1");
+      window.setTimeout(() => aviso(matchMedia("(pointer: fine)").matches ? "⌨ Espacio = saltar · X = esquivar · Shift = correr" : "⤴ SALTA · 💨 ESQUIVA · joystick al borde = correr", 4200), 2500);
+    }
+  } catch {
+    /* sin almacenamiento */
+  }
   jugando = true;
   actualizarHud();
   actualizarBotones();
@@ -2073,7 +2270,7 @@ window.setInterval(medir, 500);
 if (new URLSearchParams(location.search).has("prueba")) {
   (window as unknown as Record<string, unknown>).__jefes = JEFES;
   (window as unknown as Record<string, unknown>).__juego = {
-    estado: () => ({ ...estado, x: chaski.raiz.position.x, z: chaski.raiz.position.z, ojo: ojoAbierto, valores: { ...valores } }),
+    estado: () => ({ ...estado, x: chaski.raiz.position.x, y: chaski.raiz.position.y, z: chaski.raiz.position.z, invulnerable: invulnerable(), ojo: ojoAbierto, valores: { ...valores } }),
     ir: (x: number, z: number) => chaski.raiz.position.set(x, 0, z),
     calidad: (c: Calidad) => aplicarCalidad(c),
     jefe,
@@ -2083,6 +2280,7 @@ if (new URLSearchParams(location.search).has("prueba")) {
     zj: zonaJuego,
     pueblo: ataque.prueba,
     mision: misionJuego.prueba,
+    misionJuego,
     iniciarMision: (id: string) => {
       const m = MISIONES.find((x) => x.id === id);
       if (m) void iniciarMision(m);

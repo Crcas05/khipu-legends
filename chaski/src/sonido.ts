@@ -5,6 +5,18 @@ let ctx: AudioContext | null = null;
 let maestro: GainNode | null = null;
 let musica: GainNode | null = null;
 let silenciado = false;
+/** Música apagada (los efectos y el ambiente siguen). */
+let sinMusica = (() => {
+  try {
+    return localStorage.getItem("chaski-sin-musica") === "1";
+  } catch {
+    return false;
+  }
+})();
+const VOL_MUSICA = 0.36;
+/** Hasta cuándo suena el tema (melodía, ritmo y bordón). Después queda solo el ambiente. */
+let temaHasta = 0;
+const TEMA_SEGUNDOS: Partial<Record<string, number>> = { andes: 55, altiplano: 55, selva: 55, costa: 55, feria: 60, cumbre: 55 };
 let musicaActiva = false;
 
 // Pentatónica menor en La (la escala del huayno): La, Do, Re, Mi, Sol
@@ -12,6 +24,7 @@ const ESCALA = [220, 261.63, 293.66, 329.63, 392, 440, 523.25, 587.33, 659.25, 7
 
 try {
   silenciado = localStorage.getItem("chaski-silencio") === "1";
+  sinMusica = localStorage.getItem("chaski-sin-musica") === "1";
 } catch {
   /* sin almacenamiento */
 }
@@ -25,7 +38,7 @@ function iniciar(): AudioContext | null {
   maestro.gain.value = silenciado ? 0 : 0.7;
   maestro.connect(ctx.destination);
   musica = ctx.createGain();
-  musica.gain.value = 0.22;
+  musica.gain.value = sinMusica ? 0 : VOL_MUSICA;
   musica.connect(maestro);
   return ctx;
 }
@@ -47,6 +60,18 @@ export function alternarSilencio(): boolean {
   return silenciado;
 }
 export const estaSilenciado = () => silenciado;
+export const musicaApagada = () => sinMusica;
+export function alternarMusica(): boolean {
+  sinMusica = !sinMusica;
+  try {
+    localStorage.setItem("chaski-sin-musica", sinMusica ? "1" : "0");
+  } catch {
+    /* ignorar */
+  }
+  if (musica && ctx) musica.gain.setTargetAtTime(sinMusica ? 0 : VOL_MUSICA, ctx.currentTime, 0.1);
+  return sinMusica;
+}
+const conTema = () => !!ctx && ctx.currentTime < temaHasta;
 
 /** Una nota con timbre de quena: seno + soplo + vibrato suave. */
 function quena(frecuencia: number, inicio: number, duracion: number, volumen = 0.25, destino?: AudioNode) {
@@ -110,6 +135,19 @@ function tono(frecuencia: number, inicio: number, duracion: number, tipo: Oscill
 }
 
 export const sonido = {
+  /** Impulso del salto. */
+  salto() {
+    ruido(0, 0.18, 0.06, 900);
+    tono(260, 0, 0.16, "sine", 0.06, 420);
+  },
+  /** Aterrizaje sobre la tierra. */
+  aterrizar() {
+    ruido(0, 0.12, 0.08, 220, "lowpass");
+  },
+  /** Silbido de la esquiva/rodada. */
+  esquive() {
+    ruido(0, 0.28, 0.07, 1800);
+  },
   toque() {
     tono(880, 0, 0.06, "triangle", 0.12);
   },
@@ -401,6 +439,10 @@ export function iniciarMusica(nuevo?: Estilo) {
   musicaActiva = true;
   const gen = ++generacion;
   const r = RECETAS[estilo];
+  // Escenas: la música de exploración suena un rato al llegar y luego queda el ambiente.
+  // Batallas, jefes y misterio suenan mientras dure la escena.
+  const dur = TEMA_SEGUNDOS[estilo];
+  temaHasta = dur ? c.currentTime + dur : Infinity;
   // Bordón
   bordonNodo?.stop();
   bordonNodo = null;
@@ -410,6 +452,7 @@ export function iniciarMusica(nuevo?: Estilo) {
     o.frequency.value = r.bordon;
     const g = c.createGain();
     g.gain.value = 0.16;
+    if (isFinite(temaHasta)) g.gain.setTargetAtTime(0, temaHasta - 2, 1.5);
     const f = c.createBiquadFilter();
     f.type = "lowpass";
     f.frequency.value = 400;
@@ -426,7 +469,7 @@ export function iniciarMusica(nuevo?: Estilo) {
     if (gen !== generacion || !ctx) return;
     while (proximo < ctx.currentTime + 0.6) {
       const patron = r.ritmo[compas % r.ritmo.length];
-      patron.forEach((golpe, i) => golpe !== "-" && percusion(golpe, proximo + i * corchea, 3 + r.registro));
+      if (proximo < temaHasta) patron.forEach((golpe, i) => golpe !== "-" && percusion(golpe, proximo + i * corchea, 3 + r.registro));
       proximo += corchea * 8;
       compas++;
     }
@@ -441,7 +484,7 @@ export function iniciarMusica(nuevo?: Estilo) {
     const motivos = MOTIVOS[estilo];
     const motivo = motivos && Math.random() < 0.55 ? motivos[Math.floor(Math.random() * motivos.length)] : null;
     const notas = motivo ? motivo.length : 4 + Math.floor(Math.random() * 4);
-    for (let i = 0; i < notas && r.melodia; i++) {
+    for (let i = 0; i < notas && r.melodia && conTema(); i++) {
       paso = motivo ? Math.max(0, Math.min(ESCALA.length - 1, motivo[i])) : Math.max(0, Math.min(ESCALA.length - 1, paso + [-2, -1, -1, 1, 1, 2][Math.floor(Math.random() * 6)]));
       const dur = (estilo === "batalla" ? [0.5, 0.5, 1] : [1, 1, 2, 3])[Math.floor(Math.random() * (estilo === "batalla" ? 3 : 4))] * corchea;
       if (r.melodia === "zampona") zampona(ESCALA[paso], t, dur * 0.95);
@@ -457,8 +500,8 @@ export function iniciarMusica(nuevo?: Estilo) {
 }
 
 /** Cambia el estilo de la música (por zona o al empezar una batalla). */
-export function cambiarMusica(nuevo: Estilo) {
-  if (nuevo === estilo && musicaActiva) return;
+export function cambiarMusica(nuevo: Estilo, repetirTema = false) {
+  if (nuevo === estilo && musicaActiva && !repetirTema) return;
   if (!musicaActiva) {
     estilo = nuevo;
     return;
@@ -476,5 +519,124 @@ export function alarma() {
 
 /** Baja la música mientras hay diálogo o retos, para no distraer. */
 export function musicaSuave(suave: boolean) {
-  if (musica && ctx) musica.gain.setTargetAtTime(suave ? 0.08 : 0.22, ctx.currentTime, 0.3);
+  if (musica && ctx) musica.gain.setTargetAtTime(sinMusica ? 0 : suave ? 0.12 : VOL_MUSICA, ctx.currentTime, 0.3);
+}
+
+// ---------------------------------------------------------------------------
+// Clima: trueno, lluvia y granizo (sintetizados)
+// ---------------------------------------------------------------------------
+let lluviaNodo: { fuente: AudioBufferSourceNode; ganancia: GainNode } | null = null;
+
+/** Trueno: estallido grave que retumba (cerca = fuerte e inmediato). */
+export function trueno(cerca = true) {
+  const c = iniciar();
+  if (!c || !maestro) return;
+  const t = c.currentTime + (cerca ? 0.05 : 0.6 + Math.random() * 0.8);
+  const n = c.createBufferSource();
+  n.buffer = ruidoBuffer(c, 3);
+  const f = c.createBiquadFilter();
+  f.type = "lowpass";
+  f.frequency.setValueAtTime(cerca ? 900 : 400, t);
+  f.frequency.exponentialRampToValueAtTime(90, t + 2.5);
+  const g = c.createGain();
+  const v = cerca ? 0.75 : 0.35;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(v, t + 0.04);
+  g.gain.setValueAtTime(v * 0.6, t + 0.3);
+  g.gain.exponentialRampToValueAtTime(v * 0.5, t + 0.6);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 2.8);
+  n.connect(f).connect(g).connect(maestro);
+  n.start(t);
+  n.stop(t + 3);
+}
+
+/** Lluvia (o granizo) continua: 0 = nada, 1 = aguacero. */
+export function lluviaSonido(intensidad: number, granizo = false) {
+  const c = iniciar();
+  if (!c || !maestro) return;
+  if (!lluviaNodo && intensidad > 0) {
+    const fuente = c.createBufferSource();
+    fuente.buffer = ruidoBuffer(c, 4);
+    fuente.loop = true;
+    const f = c.createBiquadFilter();
+    f.type = "highpass";
+    f.frequency.value = granizo ? 2500 : 1200;
+    const ganancia = c.createGain();
+    ganancia.gain.value = 0;
+    fuente.connect(f).connect(ganancia).connect(maestro);
+    fuente.start();
+    lluviaNodo = { fuente, ganancia };
+  }
+  if (!lluviaNodo) return;
+  lluviaNodo.ganancia.gain.setTargetAtTime(intensidad * (granizo ? 0.22 : 0.16), c.currentTime, 0.8);
+  if (intensidad <= 0) {
+    const n = lluviaNodo;
+    lluviaNodo = null;
+    window.setTimeout(() => {
+      try {
+        n.fuente.stop();
+      } catch {
+        /* ya detenida */
+      }
+    }, 3000);
+  }
+}
+
+/** Rugido grave (felino) o graznido para los animales corrompidos. */
+export function rugido(tipo: "felino" | "ave" | "serpiente" | "murcielago" | "zorro" = "felino") {
+  const c = iniciar();
+  if (!c || !maestro) return;
+  const t = c.currentTime;
+  const o = c.createOscillator();
+  const g = c.createGain();
+  const f = c.createBiquadFilter();
+  f.type = "lowpass";
+  if (tipo === "felino") {
+    o.type = "sawtooth";
+    o.frequency.setValueAtTime(140, t);
+    o.frequency.exponentialRampToValueAtTime(70, t + 0.7);
+    f.frequency.value = 600;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.3, t + 0.08);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+  } else if (tipo === "ave") {
+    o.type = "square";
+    o.frequency.setValueAtTime(1300, t);
+    o.frequency.exponentialRampToValueAtTime(600, t + 0.35);
+    f.frequency.value = 2500;
+    g.gain.setValueAtTime(0.12, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+  } else if (tipo === "serpiente") {
+    const n = c.createBufferSource();
+    n.buffer = ruidoBuffer(c, 1);
+    const hf = c.createBiquadFilter();
+    hf.type = "highpass";
+    hf.frequency.value = 3000;
+    const gn = c.createGain();
+    gn.gain.setValueAtTime(0.0001, t);
+    gn.gain.exponentialRampToValueAtTime(0.16, t + 0.1);
+    gn.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+    n.connect(hf).connect(gn).connect(maestro);
+    n.start(t);
+    n.stop(t + 1);
+    return;
+  } else if (tipo === "murcielago") {
+    o.type = "sine";
+    o.frequency.setValueAtTime(3200, t);
+    o.frequency.exponentialRampToValueAtTime(2200, t + 0.12);
+    f.frequency.value = 5000;
+    g.gain.setValueAtTime(0.06, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+  } else {
+    o.type = "triangle";
+    o.frequency.setValueAtTime(700, t);
+    o.frequency.exponentialRampToValueAtTime(1100, t + 0.15);
+    o.frequency.exponentialRampToValueAtTime(500, t + 0.4);
+    f.frequency.value = 2000;
+    g.gain.setValueAtTime(0.12, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+  }
+  o.connect(f).connect(g).connect(maestro);
+  o.start(t);
+  o.stop(t + 1);
 }

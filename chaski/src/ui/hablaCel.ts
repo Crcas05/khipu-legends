@@ -9,6 +9,7 @@ const TONO: Record<string, [number, number]> = {
   killa: [1.3, 1.02],
   yaru: [0.9, 0.95],
   sisa: [1.15, 1.02],
+  waman: [1.0, 1.15],
   yachaq: [0.7, 0.86],
   chaski: [1.15, 1.05],
   narrador: [1, 0.95],

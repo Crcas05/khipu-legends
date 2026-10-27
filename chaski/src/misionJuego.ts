@@ -1,6 +1,7 @@
 // Motor de las MISIONES: arma el escenario (templo, puna o selva), la exploración con enemigos,
 // y el jefe final con el DUELO DE RUNAS (el código del jugador mueve a Chaski).
 
+import { esquivoElGolpe } from "./movimiento";
 import { Scene } from "@babylonjs/core/scene";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
@@ -22,6 +23,9 @@ import { poblar, type Colocacion } from "./paisaje";
 import { texturaPiedraInca, texturaIchu, texturaHojarasca, texturaPasto } from "./texturas";
 import { crearTerreno, crearPastizal, type OpcionesTerreno } from "./terreno";
 import { duelo, type Accion, type ResultadoDuelo } from "./ui/duelo";
+import { armaActual, lanzarProyectil, golpeChampi } from "./armas";
+import { Fieras, FIERAS_DE } from "./fieras";
+import { ponerClima } from "./clima";
 
 export const LIMITE_MISION = 21;
 export const INICIO_MISION = new Vector3(0, 0, -16);
@@ -47,6 +51,7 @@ interface Bug {
   lleva?: Mesh;
   meta?: Vicuna;
   casa: Vector3;
+  quietoHasta?: number;
 }
 interface Vicuna {
   raiz: TransformNode;
@@ -105,8 +110,31 @@ export class MisionJuego {
   private oroMat: StandardMaterial;
   private semillaMat: StandardMaterial;
   enDuelo = false;
+  /** Animales corrompidos por el Bug (emboscada a mitad de la misión). */
+  fieras: Fieras;
+  private emboscada = false;
+  private porLlegar = 0;
+  private get quedanFieras() {
+    return this.fieras.vivas.length + this.porLlegar;
+  }
+  vida = 100;
 
   constructor(private c: Contexto) {
+    this.fieras = new Fieras({
+      escena: c.escena,
+      jugador: c.jugador,
+      dano: (n) => this.dano(n),
+      aviso: c.aviso,
+      limite: LIMITE_MISION,
+      alPurificar: () => {
+        this.pintarObjetivo();
+        if (this.emboscada && !this.quedanFieras) {
+          ponerClima("nublado");
+          this.c.aviso("🌤 ¡Purificaste a todos! La tormenta se calma…", 2600);
+          window.setTimeout(() => this.revisarFin(), 600);
+        }
+      },
+    });
     const e = c.escena;
     this.bugMat = new StandardMaterial("m-bug-mision", e);
     this.bugMat.diffuseColor = Color3.FromHexString("#8b3dff");
@@ -146,6 +174,11 @@ export class MisionJuego {
   }
 
   salir() {
+    this.fieras.limpiar();
+    this.emboscada = false;
+    this.porLlegar = 0;
+    this.vida = 100;
+    ponerClima("sol");
     for (const b of this.bugs) b.raiz.dispose();
     for (const v of this.vicunas) v.raiz.dispose();
     for (const i of this.items) i.malla.dispose();
@@ -645,32 +678,98 @@ export class MisionJuego {
 
   disparar(adelante: Vector3) {
     if (!this.mision || this.recarga > 0 || this.fase !== "explorar") return;
-    this.recarga = 0.4;
+    const a = armaActual();
+    this.recarga = a.recarga;
     const p = this.c.jugador();
-    let objetivo: Bug | null = null;
-    let mejor = 15;
-    for (const b of this.bugs) {
-      if (b.vida <= 0) continue;
-      const d = Vector3.Distance(p, b.raiz.position);
-      if (d < mejor) [mejor, objetivo] = [d, b];
-    }
-    let jaula: Jaula | null = null;
-    if (!objetivo) {
-      let mj = 15;
-      for (const j of this.jaulas) {
-        if (j.libre) continue;
-        const d = Vector3.Distance(p, j.raiz.position);
-        if (d < mj) [mj, jaula] = [d, j];
-      }
-    }
     this.c.chaski.lanzar();
     sonido.toque();
+    const golpeBug = (b: Bug) => {
+      for (let i = 0; i < a.danio && b.vida > 0; i++) this.golpearBug(b);
+      if (a.aturde && b.vida > 0) b.quietoHasta = this.tiempo + a.aturde;
+    };
+    const golpeJaula = (j: Jaula) => {
+      for (let i = 0; i < a.danio && !j.libre; i++) this.golpearJaula(j);
+    };
+    // Champi: golpe a todo lo cercano
+    if (a.area) {
+      golpeChampi(this.c.escena, p, a.area);
+      this.c.sacudida.disparar(0.2);
+      let algo = false;
+      for (const b of this.bugs.filter((x) => x.vida > 0 && Vector3.Distance(p, x.raiz.position) < a.area)) {
+        golpeBug(b);
+        algo = true;
+      }
+      for (const f of this.fieras.cercanas(p, a.area)) {
+        this.fieras.golpear(f, a.danio);
+        algo = true;
+      }
+      for (const j of this.jaulas.filter((x) => !x.libre && Vector3.Distance(p, x.raiz.position) < a.area + 1.2)) {
+        golpeJaula(j);
+        algo = true;
+      }
+      if (!algo) this.c.aviso("🔨 El champi golpea de cerca: ¡acércate más!", 1400);
+      return;
+    }
+    // A distancia: lo más cercano (Bug, animal o jaula)
+    type Blanco = { pos: Vector3; dist: number; golpe: () => void };
+    const blancos: Blanco[] = [];
+    for (const b of this.bugs) if (b.vida > 0) blancos.push({ pos: b.raiz.position.add(new Vector3(0, 0.4, 0)), dist: Vector3.Distance(p, b.raiz.position), golpe: () => b.vida > 0 && golpeBug(b) });
+    for (const f of this.fieras.vivas) blancos.push({ pos: f.raiz.position.add(new Vector3(0, 0.7, 0)), dist: Vector3.Distance(p, f.raiz.position), golpe: () => this.fieras.golpear(f, a.danio, a.aturde) });
+    const armados = blancos.filter((x) => x.dist < a.alcance);
+    if (!armados.length) for (const j of this.jaulas) if (!j.libre) blancos.push({ pos: j.raiz.position.add(new Vector3(0, 1.4, 0)), dist: Vector3.Distance(p, j.raiz.position), golpe: () => golpeJaula(j) });
+    const elegido = blancos.filter((x) => x.dist < a.alcance).sort((x, y) => x.dist - y.dist)[0];
     const desde = p.add(new Vector3(0, 1.6, 0));
-    const hasta = objetivo ? objetivo.raiz.position.add(new Vector3(0, 0.4, 0)) : jaula ? jaula.raiz.position.add(new Vector3(0, 1.4, 0)) : desde.add(adelante.scale(10));
-    this.proyectil(desde, hasta, "#fff6d6").then(() => {
-      if (objetivo && objetivo.vida > 0) this.golpearBug(objetivo);
-      else if (jaula) this.golpearJaula(jaula);
+    lanzarProyectil(this.c.escena, desde, elegido ? elegido.pos : desde.add(adelante.scale(10)), a, () => elegido?.golpe());
+  }
+
+  /** Daño a Chaski durante la exploración (si cae, vuelve al inicio). */
+  private dano(n: number) {
+    // Si Chaski saltó o rodó a tiempo, el golpe falla
+    if (esquivoElGolpe()) return;
+    this.vida -= n;
+    this.c.chaski.golpeado();
+    this.c.sacudida.disparar(0.3);
+    sonido.error();
+    document.body.classList.remove("golpe");
+    void document.body.offsetWidth;
+    document.body.classList.add("golpe");
+    if (this.vida <= 0) {
+      this.vida = 100;
+      this.c.jugador().copyFrom(INICIO_MISION);
+      this.c.aviso("💫 ¡Te derribaron! Tuki te llevó al inicio. Usa el 🔨 champi o la 🪢 liwi si las tienes.", 3500);
+    }
+  }
+
+  /** A mitad de la misión: tormenta y animales corrompidos. */
+  private lanzarEmboscada() {
+    const m = this.mision;
+    if (!m || this.emboscada || this.fase !== "explorar") return;
+    this.emboscada = true;
+    ponerClima(m.ambiente === "puna" ? "granizo" : "tormenta");
+    sonido.pututu();
+    this.c.sacudida.disparar(0.6);
+    const p = this.c.jugador();
+    const especies = FIERAS_DE[m.ambiente] ?? FIERAS_DE.plaza;
+    this.porLlegar = especies.length;
+    especies.forEach((esp, i) => {
+      const a = (i / especies.length) * Math.PI * 2 + 0.5;
+      window.setTimeout(() => {
+        this.porLlegar = Math.max(0, this.porLlegar - 1);
+        if (!this.mision || this.fase !== "explorar") return;
+        const x = Math.max(-LIMITE_MISION + 2, Math.min(LIMITE_MISION - 2, p.x + Math.sin(a) * 11));
+        const z = Math.max(-LIMITE_MISION + 2, Math.min(LIMITE_MISION - 2, p.z + Math.cos(a) * 11));
+        this.fieras.aparecer(esp, new Vector3(x, 0, z));
+      }, 700 + i * 700);
     });
+    const nombres = m.ambiente === "templo" ? "pumas y zorros" : m.ambiente === "puna" ? "cóndores y zorros" : "un otorongo, una anaconda y murciélagos";
+    this.c.aviso(`⚡ ¡EMBOSCADA! El Bug corrompió a ${nombres}. ¡Purifícalos con tus armas!`, 4000);
+    this.pintarObjetivo();
+  }
+
+  private revisarFin() {
+    const m = this.mision;
+    if (!m) return;
+    if (this.progreso >= m.exploracion.total && !this.quedanFieras) this.listoParaJefe();
   }
 
   private proyectil(desde: Vector3, hasta: Vector3, color: string, arco = 1.2): Promise<void> {
@@ -736,13 +835,23 @@ export class MisionJuego {
     this.recarga = Math.max(0, this.recarga - dt);
     const p = this.c.jugador();
     const quieto = pausado || this.enDuelo;
+    this.fieras.actualizar(dt, quieto);
+    if (!this.emboscada && !quieto && this.fase === "explorar" && this.progreso >= Math.ceil(m.exploracion.total / 2)) this.lanzarEmboscada();
+    if (!quieto && this.vida < 100) this.vida = Math.min(100, this.vida + dt * 3);
+    const hud = document.getElementById("hud-pueblo");
+    if (hud) {
+      hud.hidden = this.fase !== "explorar";
+      (document.getElementById("vida-pueblo") as HTMLElement).style.width = `${Math.max(0, this.vida)}%`;
+      const a = armaActual();
+      document.getElementById("runa-carga")!.textContent = `${a.icono} ${a.nombre}`;
+    }
     // Bugs
     for (const b of this.bugs) {
       if (b.vida <= 0) continue;
       b.t += dt;
       const r = b.raiz;
       const d = Vector3.Distance(p, r.position);
-      if (!quieto) {
+      if (!quieto && !((b.quietoHasta ?? 0) > this.tiempo)) {
         let meta: Vector3;
         if (b.meta && m.exploracion.tipo === "proteger") meta = b.meta.raiz.position;
         else if (d < 7) meta = p;
@@ -851,7 +960,7 @@ export class MisionJuego {
     sonido.tesoro();
     it.malla.dispose();
     this.progreso++;
-    this.c.chaski.festejar();
+    this.c.chaski.recoger();
     this.c.aviso(`${m.ambiente === "selva" ? "🌱 Semilla de lupuna" : "🌞 Pieza de oro"}: ${this.progreso}/${m.exploracion.total}`, 1800);
     this.pintarObjetivo();
     if (this.progreso >= m.exploracion.total) this.listoParaJefe();
@@ -863,7 +972,7 @@ export class MisionJuego {
     const p = this.c.jugador();
     let mejor: Vector3 | null = null;
     let d = Infinity;
-    const candidatos = [...this.jaulas.filter((j) => !j.libre).map((j) => j.raiz.position), ...this.items.filter((i) => !i.tomado).map((i) => i.malla.position), ...this.bugs.filter((b) => b.vida > 0 && !b.lleva).map((b) => b.raiz.position), ...this.bugs.filter((b) => b.lleva).map((b) => b.raiz.position)];
+    const candidatos = [...this.fieras.vivas.map((f) => f.raiz.position), ...this.jaulas.filter((j) => !j.libre).map((j) => j.raiz.position), ...this.items.filter((i) => !i.tomado).map((i) => i.malla.position), ...this.bugs.filter((b) => b.vida > 0 && !b.lleva).map((b) => b.raiz.position), ...this.bugs.filter((b) => b.lleva).map((b) => b.raiz.position)];
     for (const c of candidatos) {
       const dd = Vector3.Distance(p, c);
       if (dd < d) [d, mejor] = [dd, c];
@@ -876,6 +985,7 @@ export class MisionJuego {
     if (!m) return [];
     return [
       [`${m.exploracion.objetivo}: ${Math.min(this.progreso, m.exploracion.total)}/${m.exploracion.total}`, this.progreso >= m.exploracion.total],
+      ...(this.emboscada ? [[`Purifica a los animales corrompidos (${this.quedanFieras} quedan)`, !this.quedanFieras] as [string, boolean]] : []),
       [`Duelo de runas contra ${m.jefe.nombre}`, this.fase === "fin"],
     ];
   }
@@ -893,6 +1003,12 @@ export class MisionJuego {
   // ---------------------------------------------------------------------------
   private listoParaJefe() {
     if (this.fase !== "explorar") return;
+    if (!this.emboscada) this.lanzarEmboscada();
+    if (this.quedanFieras) {
+      this.c.aviso(`🐾 ¡Aún quedan ${this.quedanFieras} animales corrompidos! Purifícalos para seguir.`, 2600);
+      this.pintarObjetivo();
+      return;
+    }
     this.fase = "duelo";
     for (const b of this.bugs) b.raiz.dispose();
     this.bugs = [];
@@ -911,6 +1027,7 @@ export class MisionJuego {
     p.set(0, 0, -9);
     const lugar = new Vector3(0, 0, -1.5);
     cambiarMusica("batalla");
+    ponerClima(m.ambiente === "selva" ? "lluvia" : "tormenta");
     sonido.pututu();
     this.c.sacudida.disparar(0.8);
     // Despeja la vista: nada entre Chaski y el jefe
@@ -989,7 +1106,7 @@ export class MisionJuego {
     const mano = p.add(new Vector3(0, 1.6, 0.3));
     switch (a.a) {
       case "atacar": {
-        ch.lanzar();
+        ch.hechizo();
         sonido.toque();
         await this.proyectil(mano, this.posJefe(), "#ffe08a", 0.6);
         this.jefe?.golpear();
@@ -999,19 +1116,19 @@ export class MisionJuego {
         break;
       }
       case "rebota": {
-        ch.lanzar();
+        ch.hechizo();
         await this.proyectil(mano, this.posJefe(), "#ffe08a", 0.6);
         sonido.error();
         estallido(e, this.posJefe(), ["#c9d6ff", "#8fa0ff"], 30, 4);
         break;
       }
       case "esquivar":
-        ch.saltar();
+        ch.esquivar(1);
         sonido.toque();
         await this.espera(350);
         break;
       case "romper":
-        ch.lanzar();
+        ch.hechizo();
         await this.proyectil(mano, this.posJefe(), "#4ff0dc", 0.4);
         estallido(e, this.posJefe(), ["#c9d6ff", "#ffffff", "#4ff0dc"], 110, 9);
         this.escudoJefe?.dispose();
@@ -1113,6 +1230,7 @@ export class MisionJuego {
     if (this.chulla) this.chulla.festejar();
     this.c.chaski.festejar();
     if (this.disco) this.disco.emissiveColor = new Color3(1, 0.8, 0.2);
+    ponerClima("sol");
     await this.espera(1200);
   }
 
@@ -1136,6 +1254,7 @@ export class MisionJuego {
         this.golpearBug(b);
       }
       for (const it of this.items.filter((i) => !i.tomado)) this.recoger(it);
+      for (const f of [...this.fieras.vivas]) this.fieras.golpear(f, 99);
       for (const j of this.jaulas.filter((x) => !x.libre)) {
         j.vida = 1;
         this.golpearJaula(j);

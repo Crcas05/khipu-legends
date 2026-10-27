@@ -5,6 +5,7 @@
 import { Scene } from "@babylonjs/core/scene";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { armaActual } from "./armas";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
@@ -105,12 +106,57 @@ export class Chaski {
 
   /** Lanza la animación de hechizo (al atacar). */
   lanzar() {
+    const m = this.modelo;
+    if (!m) return;
+    // Cada arma andina tiene su propio movimiento
+    const arma = armaActual().id;
+    if (arma === "champi" && m.tiene("1H_Melee_Attack_Chop")) m.accion("1H_Melee_Attack_Chop", 0.75);
+    else if (arma === "arco" && m.tiene("1H_Ranged_Shoot")) m.accion("1H_Ranged_Shoot", 0.8);
+    else if (m.tiene("Throw")) m.accion("Throw", 0.7);
+    else m.accion("Spellcast_Shoot", 0.9);
+  }
+
+  /** Lanza el hechizo de código (duelos y runas). */
+  hechizo() {
     this.modelo?.accion("Spellcast_Shoot", 0.9);
   }
 
-  /** Salto para esquivar. */
-  saltar() {
-    this.modelo?.accion("Jump_Full_Short", 0.8);
+  /** Salto (largo si va corriendo). */
+  saltar(largo = false) {
+    const m = this.modelo;
+    if (!m) return;
+    if (largo && m.tiene("Jump_Full_Long")) m.accion("Jump_Full_Long", 0.9);
+    else m.accion("Jump_Full_Short", 0.8);
+  }
+
+  /** Rueda/esquiva hacia un lado. lado: -1 izquierda, 0 adelante, 1 derecha. */
+  esquivar(lado: number) {
+    const m = this.modelo;
+    if (!m) return;
+    const a = lado < 0 ? "Dodge_Left" : lado > 0 ? "Dodge_Right" : "Dodge_Forward";
+    m.accion(m.tiene(a) ? a : "Jump_Full_Short", 0.55);
+  }
+
+  /** Se agacha a recoger algo. */
+  recoger() {
+    if (this.modelo?.tiene("PickUp")) this.modelo.accion("PickUp", 0.8);
+    else this.gesto();
+  }
+
+  /** Patada rápida (sin arma). */
+  patada() {
+    if (this.modelo?.tiene("Unarmed_Melee_Attack_Kick")) this.modelo.accion("Unarmed_Melee_Attack_Kick", 0.6);
+  }
+
+  /** Hacia dónde mira Chaski (radianes). */
+  get mirada() {
+    return this.angulo;
+  }
+
+  /** Para esquivar sin girar el cuerpo. */
+  fijarMirada(a: number) {
+    this.angulo = a;
+    this.raiz.rotation.y = a;
   }
 
   /** Gesto al hablar (mueve las manos). */
@@ -304,17 +350,17 @@ export class Chaski {
   }
 
   /** dx, dz: dirección de movimiento (-1 a 1). dt en segundos. */
-  actualizar(dx: number, dz: number, dt: number) {
+  actualizar(dx: number, dz: number, dt: number, sprint = false, girar = true) {
     const fuerza = Math.min(1, Math.hypot(dx, dz));
     if (this.modelo) {
-      if (fuerza > 0.05) {
+      if (fuerza > 0.05 && girar) {
         const objetivo = Math.atan2(dx, dz);
         let diferencia = objetivo - this.angulo;
         diferencia = Math.atan2(Math.sin(diferencia), Math.cos(diferencia));
         this.angulo += diferencia * Math.min(1, dt * 12);
         this.raiz.rotation.y = this.angulo;
       }
-      this.modelo.mover(fuerza, dt);
+      this.modelo.mover(fuerza, dt, sprint && fuerza > 0.3);
       return;
     }
     if (fuerza > 0.05) {

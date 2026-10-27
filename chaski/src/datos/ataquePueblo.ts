@@ -29,7 +29,10 @@ export const RUNAS_WAWA: PreguntaRuna[] = [
 ];
 
 export const ALARMA_INTRO: Linea[] = [
-  { quien: "tuki", texto: "¡Kraa! ¡Lo espantaste, {nombre}! Pero mira: el Bug Ch'aqwa soltó mini-Bugs. ¡Van hacia la fuente!" },
+  { quien: "narrador", texto: "Se escucha un pututo a lo lejos: ¡uuuuuu! Un chaski llega corriendo por el camino…" },
+  { quien: "waman", texto: "¡Allillanchu! Soy Waman, chaski del tambo del río. Corrí sin parar con este khipu." },
+  { quien: "waman", texto: "Sus nudos dicen: ¡el Bug Ch'aqwa soltó mini-Bugs y viene una tormenta! ¡Van hacia la fuente!" },
+  { quien: "tuki", texto: "¡Kraa! ¡A defender el pueblo, {nombre}!" },
   { quien: "tuki", texto: "¡Y atraparon a Mama Khipu en una burbuja! Toca 🎯 HUARACA para dispararles antes de que se acabe el tiempo." },
 ];
 

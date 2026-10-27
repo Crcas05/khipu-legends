@@ -135,6 +135,13 @@ body.vertical #zona-joystick { width: 62vw; height: 50vh; }
 .boton-redondo.hablar { background: radial-gradient(circle at 35% 30%, #ffd166, #d98a12); color: #3a1d06; width: 70px; height: 70px; animation: late 1s infinite; }
 .boton-redondo.taller { background: radial-gradient(circle at 35% 30%, #c78bff, #6a2bbf); width: 64px; height: 64px; font-size: 11px; }
 @keyframes late { 50% { transform: scale(1.08); } }
+/* Saltar / esquivar: a la izquierda de los botones de acción, como un mando */
+.botones-mover { position: fixed; right: calc(max(20px, env(safe-area-inset-right)) + 92px); bottom: 20px; z-index: 6; display: flex; gap: 10px; align-items: flex-end; }
+.boton-redondo.saltar { width: 66px; height: 66px; font-size: 11px; background: radial-gradient(circle at 35% 30%, #8fe36b, #2f8a1c); }
+.boton-redondo.esquivar { width: 58px; height: 58px; font-size: 10px; background: radial-gradient(circle at 35% 30%, #7ec8ff, #1f5fa8); margin-bottom: 30px; }
+.boton-redondo.esquivar.recargando { opacity: .45; }
+.dano.esquive { top: 48%; font-size: 28px; color: #bff3ff; text-shadow: 0 3px 0 #1f5fa8, 0 0 14px #7ec8ff; }
+body.hablando .botones-mover, body.en-prologo .botones-mover { opacity: .25; pointer-events: none; }
 body.hablando .botones-accion, body.hablando #joystick { opacity: .25; pointer-events: none; }
 @media (hover: hover) and (pointer: fine) { #zona-joystick, #joystick { display: none; } }
 
@@ -818,3 +825,12 @@ body.vertical .duelo-chaski { top: calc(max(8px, env(safe-area-inset-top)) + 96p
 .fila-texto small { color: #9fb0ff; font-size: 12px; }
 .fila-estrellas { font-size: 14px; font-weight: 800; color: #ffd166; white-space: nowrap; }
 .mision-icono.chico { width: 40px; height: 40px; font-size: 22px; }
+/* Clima */
+#relampago { position: fixed; inset: 0; z-index: 3; pointer-events: none; background: #eef4ff; opacity: 0; }
+#relampago.on { animation: relampago .7s ease-out; }
+@keyframes relampago { 0% { opacity: .85; } 10% { opacity: .1; } 18% { opacity: .65; } 100% { opacity: 0; } }
+body[data-clima="tormenta"] #lienzo { filter: saturate(.75) contrast(1.05); }
+body[data-clima="lluvia"] #lienzo, body[data-clima="granizo"] #lienzo { filter: saturate(.85); }
+.boton-redondo.cambiar-arma { width: 46px; height: 46px; font-size: 20px; background: radial-gradient(circle at 35% 30%, #8fa0ff, #2c3570); margin-bottom: -4px; }
+.fila-mision.en-uso { border-color: #7dffb0; }
+.arma-dato { display: block; color: #c9a86a !important; font-style: italic; margin-top: 2px; }

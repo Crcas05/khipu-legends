@@ -121,3 +121,48 @@ export function llegaMensajero(escena: Scene, tipo: Ave, destino: Vector3): { at
     },
   };
 }
+
+/** Un chaski (corredor inca) llega corriendo por el camino tocando el pututo. */
+export async function llegaChaskiCorredor(escena: Scene, destino: Vector3, crear: () => Promise<{ raiz: TransformNode; mover: (dx: number, dz: number, dt: number) => void }>) {
+  const corredor = await crear();
+  const r = corredor.raiz;
+  const fin = destino.add(new Vector3(-2.2, 0, -1.4));
+  r.position.set(fin.x - 2, 0, fin.z - 26);
+  sonido.pututu();
+  window.setTimeout(() => sonido.pututu(), 1600);
+  let fase: "corre" | "llego" | "se-va" = "corre";
+  let resolver: () => void = () => {};
+  const llega = new Promise<void>((res) => (resolver = res));
+  const obs = escena.onBeforeRenderObservable.add(() => {
+    const dt = escena.getEngine().getDeltaTime() / 1000;
+    if (fase === "corre") {
+      const dx = fin.x - r.position.x;
+      const dz = fin.z - r.position.z;
+      const d = Math.hypot(dx, dz);
+      if (d < 0.4) {
+        fase = "llego";
+        corredor.mover(0, 0, dt);
+        r.rotation.y = Math.atan2(destino.x - r.position.x, destino.z - r.position.z);
+        resolver();
+        return;
+      }
+      r.position.x += (dx / d) * Math.min(d, 9 * dt);
+      r.position.z += (dz / d) * Math.min(d, 9 * dt);
+      corredor.mover(dx / d, dz / d, dt);
+    } else if (fase === "se-va") {
+      r.position.z -= 9 * dt;
+      corredor.mover(0, -1, dt);
+      if (r.position.z < fin.z - 30) {
+        escena.onBeforeRenderObservable.remove(obs);
+        r.dispose();
+      }
+    } else corredor.mover(0, 0, dt);
+  });
+  return {
+    llega,
+    vete: () => {
+      fase = "se-va";
+      sonido.pututu();
+    },
+  };
+}

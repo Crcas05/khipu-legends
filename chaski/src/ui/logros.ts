@@ -9,6 +9,11 @@ import { PROGRAMA, ZONAS } from "../datos/zonas";
 
 export const LOGROS: Record<string, { icono: string; nombre: string; texto: string }> = {
   prologo: { icono: "🌅", nombre: "Primeras runas", texto: "Aprendiste 4 conceptos en un minuto" },
+  "arma-champi": { icono: "🔨", nombre: "Forjador del champi", texto: "Forjaste la maza con if / else" },
+  "arma-lanza": { icono: "🔱", nombre: "Lanza de chonta", texto: "Forjaste la lanza con un acumulador en un for" },
+  "arma-liwi": { icono: "🪢", nombre: "Maestro del liwi", texto: "Forjaste las boleadoras con una lista" },
+  "arma-arco": { icono: "🏹", nombre: "Arquero de la selva", texto: "Forjaste el arco con un diccionario" },
+  arsenal: { icono: "⚔", nombre: "Arsenal andino", texto: "Forjaste todas las armas con código" },
   "mision-oro": { icono: "🌞", nombre: "El oro vuelve al Inti", texto: "Recuperaste el oro del Qorikancha con for y listas" },
   "mision-vicuna": { icono: "🦙", nombre: "Guardián de la vicuña", texto: "Protegiste a las vicuñas con if y while" },
   "mision-chullachaqui": { icono: "🌳", nombre: "Amigo del Chullachaqui", texto: "Cuidaste la selva con if/else y funciones" },

@@ -45,7 +45,9 @@ function cargar(escena: Scene, archivo: string): Promise<AssetContainer> {
   return contenedores.get(archivo)!;
 }
 
-export type Animacion = "Idle" | "Walking_A" | "Running_A" | "Cheer" | "Spellcast_Shoot" | "Hit_A" | "Interact" | "Jump_Full_Short" | "Block";
+export type Animacion =
+  | "Idle" | "Walking_A" | "Running_A" | "Running_B" | "Cheer" | "Spellcast_Shoot" | "Hit_A" | "Interact" | "Jump_Full_Short" | "Jump_Full_Long" | "Block"
+  | "Dodge_Forward" | "Dodge_Left" | "Dodge_Right" | "Throw" | "1H_Melee_Attack_Chop" | "1H_Ranged_Shoot" | "PickUp" | "Unarmed_Melee_Attack_Kick";
 
 /** Un personaje animado. Se coloca dentro de "padre" (el nodo que el juego mueve). */
 export class Modelo {
@@ -84,14 +86,20 @@ export class Modelo {
     this.unaVez = segundos;
   }
 
+  /** Si el modelo tiene esa animación (los acompañantes tienen menos). */
+  tiene(a: Animacion) {
+    return this.anims.has(a);
+  }
+
   /** Elige caminar/correr/quieto según la fuerza del movimiento. */
-  mover(fuerza: number, dt: number) {
+  mover(fuerza: number, dt: number, sprint = false) {
     if (this.unaVez > 0) {
       this.unaVez -= dt;
       if (this.unaVez > 0) return;
       this.actual = null;
     }
-    if (fuerza > 0.65) this.tocar("Running_A");
+    if (sprint && this.tiene("Running_B")) this.tocar("Running_B");
+    else if (fuerza > 0.65) this.tocar("Running_A");
     else if (fuerza > 0.08) this.tocar("Walking_A");
     else this.tocar("Idle");
   }
