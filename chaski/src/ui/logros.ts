@@ -9,6 +9,10 @@ import { PROGRAMA, ZONAS } from "../datos/zonas";
 
 export const LOGROS: Record<string, { icono: string; nombre: string; texto: string }> = {
   prologo: { icono: "🌅", nombre: "Primeras runas", texto: "Aprendiste 4 conceptos en un minuto" },
+  "mision-oro": { icono: "🌞", nombre: "El oro vuelve al Inti", texto: "Recuperaste el oro del Qorikancha con for y listas" },
+  "mision-vicuna": { icono: "🦙", nombre: "Guardián de la vicuña", texto: "Protegiste a las vicuñas con if y while" },
+  "mision-chullachaqui": { icono: "🌳", nombre: "Amigo del Chullachaqui", texto: "Cuidaste la selva con if/else y funciones" },
+  "tres-estrellas": { icono: "⭐", nombre: "Runa perfecta", texto: "Ganaste una misión con 3 estrellas" },
   defensa: { icono: "🛡", nombre: "Defensor del yaku", texto: "Salvaste la fuente de la oleada de mini-Bugs" },
   vecinos: { icono: "🫧", nombre: "Rescatista", texto: "Liberaste a todas las llamas de sus burbujas" },
   wawa: { icono: "🐛", nombre: "Primer jefe", texto: "Venciste al Ch'aqwa Wawa con runas y huaraca" },
@@ -48,7 +52,7 @@ function siguiente() {
   }
   mostrando = true;
   // Si está la pantalla de ¡Nuevo nivel!, la insignia espera su turno (no tapa el título)
-  if (!document.getElementById("nivel")!.hidden) {
+  if (!document.getElementById("nivel")!.hidden || !document.getElementById("mision-ui")!.hidden) {
     cola.unshift(clave);
     window.setTimeout(siguiente, 800);
     return;

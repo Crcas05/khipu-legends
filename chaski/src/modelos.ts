@@ -184,3 +184,40 @@ export function ponerMontera(escena: Scene, cabeza: TransformNode, escala = 1): 
   }
   return piezas;
 }
+
+// ---------------------------------------------------------------------------
+// Paisaje: modelos estáticos (KayKit Medieval Hexagon Pack, CC0) como plantillas.
+// Cada plantilla se une en una sola malla y se repite con "thin instances"
+// (cientos de árboles y montes en pocas llamadas de dibujo: va fluido en celular).
+// ---------------------------------------------------------------------------
+const plantillas = new Map<string, Promise<Map<string, Mesh>>>();
+
+export function cargarPlantillas(escena: Scene, archivo: string): Promise<Map<string, Mesh>> {
+  if (!plantillas.has(archivo)) {
+    plantillas.set(
+      archivo,
+      cargar(escena, archivo).then((c) => {
+        c.addAllToScene();
+        const raiz = c.meshes.find((m) => m.name === "__root__");
+        const mapa = new Map<string, Mesh>();
+        const hijos = (raiz?.getChildren() ?? []) as TransformNode[];
+        for (const nodo of hijos) {
+          const mallas = nodo.getChildMeshes(false).filter((m): m is Mesh => m instanceof Mesh && m.getTotalVertices() > 0);
+          if (!mallas.length) continue;
+          for (const m of mallas) m.computeWorldMatrix(true);
+          const unida = Mesh.MergeMeshes(mallas, false, true, undefined, false, false);
+          if (!unida) continue;
+          unida.name = `plantilla-${nodo.name}`;
+          // La raíz del glTF viene espejada (escala z = -1): al unir, las caras quedan al revés
+          if ((raiz?.computeWorldMatrix(true).determinant() ?? 1) < 0) unida.flipFaces(false);
+          unida.setEnabled(false);
+          unida.isPickable = false;
+          mapa.set(nodo.name, unida);
+        }
+        raiz?.dispose(false, false);
+        return mapa;
+      })
+    );
+  }
+  return plantillas.get(archivo)!;
+}

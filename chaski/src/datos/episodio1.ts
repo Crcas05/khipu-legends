@@ -6,7 +6,7 @@
 import type { Reto } from "../ui/taller";
 import type { RetoBloques } from "../ui/bloques";
 
-export type Quien = "chaski" | "mama" | "tuki" | "amaru" | "killa" | "yaru" | "narrador";
+export type Quien = "chaski" | "mama" | "tuki" | "amaru" | "killa" | "yaru" | "sisa" | "yachaq" | "narrador";
 export interface Linea {
   quien: Quien;
   texto: string;
@@ -19,6 +19,8 @@ export const NOMBRES: Record<Quien, string> = {
   amaru: "Amaru",
   killa: "Killa",
   yaru: "Yaru",
+  sisa: "Sisa, guardaparque",
+  yachaq: "Abuelo Yachaq",
   narrador: "",
 };
 
@@ -51,7 +53,7 @@ export const OBJETIVOS: Record<string, string> = {
   hablar2: "Vuelve con Mama Khipu",
   taller: "Escribe tu primera runa en el Taller",
   final: "Habla con Mama Khipu",
-  completo: "Episodio 1 completado ✓",
+  completo: "Busca a quien tenga ❗: te encargará una misión",
 };
 
 export const INTRO: Linea[] = [

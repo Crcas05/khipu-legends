@@ -741,3 +741,72 @@ body.modo-foto #portada, body.modo-foto #fondo-portada, body.modo-foto #etiqueta
 @media (max-height: 460px) { .foto-heroe { height: 104px; } }
 html:has(body.modo-foto), body.modo-foto { background: transparent !important; }
 .tarjeta-heroe[data-clave="yaru"] .foto-heroe img { object-position: center 5%; }
+
+/* ============================================================
+   MISIONES: tarjeta, resultado y DUELO DE RUNAS
+   ============================================================ */
+#mision-ui { position: fixed; inset: 0; z-index: 33; display: grid; place-items: center; padding: 12px; background: rgba(8, 10, 30, .72); overflow: auto; }
+#mision-ui[hidden] { display: none; }
+.mision-tarjeta { position: relative; width: min(560px, 96vw); display: grid; gap: 10px; padding: 16px 18px; border-radius: 18px; color: #fff;
+  background: linear-gradient(180deg, #232a5c, #141838); border: 3px solid #ffd166; box-shadow: 0 8px 0 rgba(0,0,0,.45), 0 0 40px rgba(255,209,102,.25); animation: aparece .35s ease-out; }
+.mision-cabeza { display: flex; gap: 12px; align-items: center; }
+.mision-cabeza small { color: #4ff0dc; font-weight: 900; letter-spacing: .08em; font-size: 11px; }
+.mision-cabeza h2 { margin: 0; font-size: clamp(22px, 4vw, 30px); color: #ffd166; text-shadow: 0 3px 0 #000; }
+.mision-cabeza > div { flex: 1; }
+.mision-icono { font-size: 40px; width: 58px; height: 58px; display: grid; place-items: center; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ffe08a, #c98a12); border: 3px solid #fff3c4; }
+.mision-datos { display: grid; gap: 4px; padding: 10px 12px; border-radius: 12px; background: rgba(0,0,0,.25); font-size: 14px; }
+.mision-datos p { margin: 0; }
+.mision-como { margin: 0; font-size: 13px; color: #c9d0ff; }
+.mision-botones { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+.mision-tarjeta.resultado { justify-items: center; text-align: center; overflow: hidden; }
+.mision-tarjeta.resultado .rayos { top: -120px; }
+.mision-estrellas { margin: 0; font-size: 44px; letter-spacing: 6px; animation: salta .6s ease-out; }
+.mision-detalle { margin: 0; color: #c9d0ff; font-size: 13px; }
+.mision-premio { margin: 0; font-size: 20px; font-weight: 900; color: #ffd166; }
+.mision-tarjeta .ficha { text-align: left; }
+@media (max-height: 460px) { .mision-tarjeta { gap: 6px; padding: 10px 14px; } .mision-icono { width: 44px; height: 44px; font-size: 28px; } .mision-estrellas { font-size: 32px; } }
+
+#duelo { position: fixed; inset: 0; z-index: 26; pointer-events: none; }
+#duelo[hidden] { display: none; }
+#duelo > * { pointer-events: auto; }
+body.en-duelo .botones-accion, body.en-duelo #joystick, body.en-duelo #zona-joystick, body.en-duelo .checklist, body.en-duelo #objetivo, body.en-duelo #minimapa { display: none !important; }
+.duelo-panel { position: absolute; left: max(10px, env(safe-area-inset-left)); top: 10px; bottom: 10px; width: min(560px, 56vw); display: flex; flex-direction: column; gap: 6px;
+  padding: 12px 14px; border-radius: 16px; background: rgba(14, 18, 48, .95); border: 3px solid #4f7dff; box-shadow: 0 6px 0 rgba(0,0,0,.4); color: #fff; overflow: auto; }
+.duelo-panel header { display: flex; align-items: center; gap: 8px; }
+.duelo-panel header .enfoque-titulo { flex: 0 0 auto; }
+.duelo-ronda { flex: 1; font-size: 12px; font-weight: 800; color: #4ff0dc; }
+.duelo-panel h3 { margin: 0; font-size: 18px; color: #ffd166; }
+.duelo-panel p { margin: 0; font-size: 14px; line-height: 1.35; }
+.duelo-teoria { font-size: 12.5px !important; color: #c9d0ff; background: rgba(79,125,255,.15); padding: 6px 8px; border-radius: 8px; }
+#duelo-codigo { width: 100%; min-height: 104px; flex: 0 0 auto; resize: vertical; padding: 10px 12px; border-radius: 10px; border: 2px solid #34407e; background: #070b1e; color: #c9f7ff; font-size: 15px; line-height: 1.45; tab-size: 4; }
+#duelo-codigo[readonly] { border-style: dashed; }
+.duelo-bloques { display: flex; flex-wrap: wrap; gap: 6px; }
+.bloque-duelo { padding: 7px 10px; border-radius: 9px; border: 2px solid #8fc0ff; background: linear-gradient(180deg, #2f6fe0, #1d4fb8); color: #fff; box-shadow: 0 3px 0 #0d2a6e; cursor: pointer; }
+.bloque-duelo code { font-size: 14px; white-space: pre; }
+.bloque-duelo.sangria { background: #2a2f5a; border-color: #4a5290; }
+.duelo-botones { display: flex; gap: 6px; flex-wrap: wrap; }
+.duelo-botones .boton-oro { flex: 1; min-width: 140px; }
+.duelo-tuki { padding: 8px 10px; border-radius: 10px; background: #1a1f4a; border-left: 4px solid #4ff0dc; font-size: 13.5px; }
+.duelo-tuki.bien { border-left-color: #7dffb0; background: #123a2a; }
+.duelo-tuki.mal { border-left-color: #ff6b81; background: #3a1420; }
+.duelo-barras { position: absolute; right: max(10px, env(safe-area-inset-right)); top: 10px; width: min(330px, 38vw); display: grid; gap: 4px; padding: 8px 12px; border-radius: 14px;
+  background: rgba(14, 18, 48, .9); border: 2px solid #ff3355; color: #fff; text-align: center; }
+.duelo-jefe { font-size: 15px; color: #ffc2d0; }
+.duelo-barras small { font-size: 10px; color: #c9d0ff; margin-top: -2px; }
+.duelo-barras .barra { width: 100%; height: 14px; }
+#duelo-vida-jefe { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #8b3dff, #ff3355); transition: width .3s; }
+.duelo-ataque { display: grid; grid-template-columns: auto 1fr auto; gap: 6px; align-items: center; font-size: 12px; font-weight: 800; }
+.duelo-ataque .barra { height: 10px; border-width: 1px; }
+#duelo-ataque { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ffd166, #ff3355); }
+#duelo.peligro .duelo-ataque { color: #ff6b81; animation: titila .45s infinite; }
+.duelo-chaski { position: absolute; right: max(10px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); width: min(260px, 34vw); display: grid; grid-template-columns: auto 1fr; gap: 6px; align-items: center;
+  padding: 6px 10px; border-radius: 12px; background: rgba(14, 18, 48, .9); border: 2px solid #1f8f5e; color: #fff; font-size: 12px; font-weight: 800; }
+.duelo-chaski .barra { width: 100%; height: 12px; }
+#duelo-vida-chaski { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #1f8f5e, #7dffb0); transition: width .3s; }
+body.vertical .duelo-panel { left: 8px; right: 8px; top: auto; bottom: 8px; width: auto; max-height: 58dvh; }
+body.vertical .duelo-barras { left: 8px; right: 8px; width: auto; top: max(8px, env(safe-area-inset-top)); }
+body.vertical .duelo-chaski { top: calc(max(8px, env(safe-area-inset-top)) + 96px); bottom: auto; width: 46vw; }
+@media (max-height: 460px) { .duelo-panel { padding: 8px 10px; gap: 4px; } .duelo-panel h3 { font-size: 15px; } .duelo-panel p { font-size: 12.5px; } #duelo-codigo { min-height: 84px; font-size: 13.5px; } .bloque-duelo { padding: 4px 8px; } .bloque-duelo code { font-size: 12.5px; } }
+.mapa-cabecera .mapa-pueblo { margin-left: auto; margin-right: 8px; white-space: nowrap; }
+.mision-tarjeta.resultado .nivel-banda { font-size: clamp(26px, 5vw, 40px) !important; padding: 4px 20px 8px; }
+@media (max-height: 460px) { .duelo-teoria { display: none; } .duelo-panel header .enfoque-titulo { font-size: 14px; } }

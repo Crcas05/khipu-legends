@@ -68,6 +68,24 @@ const RETRATOS: Record<string, string> = {
     <circle cx="42" cy="42" r="4" fill="#161616"/><circle cx="58" cy="42" r="4" fill="#161616"/>
     <ellipse cx="50" cy="56" rx="9" ry="6" fill="#e8dcc6"/><path d="M46 57 Q50 60 54 57" stroke="#5a3a2a" stroke-width="2" fill="none"/>
     <rect x="30" y="80" width="40" height="8" fill="#c8102e"/>`,
+  sisa: `
+    <circle cx="50" cy="50" r="50" fill="#5d7a3a"/>
+    <path d="M10 100 Q50 70 90 100Z" fill="#8a7a4a"/>
+    <path d="M30 60 Q28 86 40 92 L40 70Z M70 60 Q72 86 60 92 L60 70Z" fill="#2a1a12"/>
+    <circle cx="50" cy="56" r="23" fill="#b07a52"/>
+    <ellipse cx="50" cy="36" rx="36" ry="7" fill="#6b5a32"/><path d="M32 36 Q34 18 50 18 Q66 18 68 36Z" fill="#7d6a3a"/>
+    <rect x="32" y="31" width="36" height="4" fill="#c8102e"/>
+    <circle cx="42" cy="58" r="3.4" fill="#2a1a12"/><circle cx="58" cy="58" r="3.4" fill="#2a1a12"/>
+    <path d="M44 68 Q50 72 56 68" stroke="#7a2318" stroke-width="2.5" fill="none"/>`,
+  yachaq: `
+    <circle cx="50" cy="50" r="50" fill="#2f5a3a"/>
+    <path d="M10 100 Q50 70 90 100Z" fill="#d9c9a3"/>
+    <path d="M22 100 L30 74 L50 82 L70 74 L78 100Z" fill="#c8102e"/>
+    <circle cx="50" cy="56" r="23" fill="#8f6b4a"/>
+    <path d="M30 52 Q32 30 50 30 Q68 30 70 52 Q66 40 50 40 Q34 40 30 52Z" fill="#e8e8e8"/>
+    <path d="M34 62 Q50 92 66 62 Q60 74 50 74 Q40 74 34 62Z" fill="#f0f0f0"/>
+    <path d="M38 55 L46 55 M54 55 L62 55" stroke="#2a1a12" stroke-width="3" stroke-linecap="round"/>
+    <path d="M40 46 L46 48 M60 46 L54 48" stroke="#ddd" stroke-width="3"/>`,
 };
 
 export function retrato(clave: string, tam = 64): string {

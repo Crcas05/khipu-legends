@@ -99,6 +99,7 @@ export function abrirMapa(): Promise<string | null> {
     <div class="mapa-marco">
       <header class="mapa-cabecera">
         <div><h2>🗺 MAPA DEL VIAJE</h2><p>Recorre el Perú y aprende Python y SQL · <b>${hechas}/10</b> zonas</p></div>
+        <button class="boton-secundario mapa-pueblo" id="mapa-pueblo">🏘 Pueblo · Misiones</button>
         <button class="cerrar" aria-label="Cerrar">✕</button>
       </header>
       <div class="mapa-cuerpo">
@@ -125,6 +126,10 @@ export function abrirMapa(): Promise<string | null> {
       resolver(v);
     };
     caja.querySelector(".cerrar")!.addEventListener("click", () => cerrar(null));
+    caja.querySelector("#mapa-pueblo")!.addEventListener("click", () => {
+      sonido.toque();
+      cerrar("pueblo");
+    });
     const detalle = caja.querySelector<HTMLElement>("#mapa-detalle")!;
     const mostrar = (i: number) => {
       const n = NODOS[i];

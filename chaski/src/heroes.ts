@@ -108,6 +108,11 @@ export class Chaski {
     this.modelo?.accion("Spellcast_Shoot", 0.9);
   }
 
+  /** Salto para esquivar. */
+  saltar() {
+    this.modelo?.accion("Jump_Full_Short", 0.8);
+  }
+
   /** Gesto al hablar (mueve las manos). */
   gesto() {
     this.modelo?.accion("Interact", 1.1);

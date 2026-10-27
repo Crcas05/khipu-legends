@@ -21,7 +21,7 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Texture } from "@babylonjs/core/Materials/Textures/texture";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
 import { crearMundo, resolverChoques } from "./mundo";
-import { Tuki, crearLlama } from "./personajes";
+import { Tuki, crearLlama, material } from "./personajes";
 import { Chaski, MamaKhipu, crearMarcador } from "./heroes";
 import { entrada, iniciarControles } from "./controles";
 import { estado, guardar, hayPartida, reiniciar, yaPaso, enSelva, enValle, type Paso } from "./estado";
@@ -41,6 +41,10 @@ import { crearValle, SITIOS, INICIO_VALLE, LIMITE_VALLE, type Sitio } from "./va
 import { ValleJuego } from "./valleJuego";
 import { ZonaJuego } from "./zonaJuego";
 import { AtaquePueblo } from "./ataquePueblo";
+import { poblar } from "./paisaje";
+import { MisionJuego, LIMITE_MISION, INICIO_MISION } from "./misionJuego";
+import { MISIONES, type Mision } from "./datos/misiones";
+import { tarjetaMision, resultadoMision } from "./ui/misionUI";
 import { INICIO_ZONA, LIMITE_ZONA } from "./zonaMundo";
 import { ZONAS, type Zona } from "./datos/zonas";
 import type { SitioZona } from "./datos/zonas";
@@ -70,8 +74,8 @@ escena.clearColor = CIELO;
 escena.ambientColor = new Color3(0.35, 0.35, 0.35);
 escena.fogMode = Scene.FOGMODE_LINEAR;
 escena.fogColor = new Color3(0.72, 0.86, 0.95);
-escena.fogStart = 45;
-escena.fogEnd = 95;
+escena.fogStart = 60;
+escena.fogEnd = 150;
 
 let radioBase = 20;
 let betaBase = 0.82;
@@ -117,6 +121,24 @@ const mama = new MamaKhipu(escena, MAMA_POS.x, MAMA_POS.z, 2.7);
 mundo.choques.push({ x: MAMA_POS.x, z: MAMA_POS.z, r: 0.9 });
 const marcador = crearMarcador(escena);
 marcador.position.set(MAMA_POS.x, 3.6, MAMA_POS.z);
+// Quienes encargan misiones en el pueblo (Mama Khipu, Sisa la guardaparque y el abuelo Yachaq)
+const sisa = new Chaski(escena, true);
+sisa.raiz.position.set(7.5, 0, -6.5);
+sisa.raiz.rotation.y = -2.4;
+const yachaq = new Chaski(escena, true);
+yachaq.raiz.position.set(-7.5, 0, -6.5);
+yachaq.raiz.rotation.y = 2.4;
+const NPC_POS: Record<"mama" | "sisa" | "yachaq", Vector3> = { mama: MAMA_POS, sisa: sisa.raiz.position, yachaq: yachaq.raiz.position };
+const marcadoresMision = (["mama", "sisa", "yachaq"] as const).map((q) => {
+  const mk = crearMarcador(escena);
+  mk.position.set(NPC_POS[q].x, 3.5, NPC_POS[q].z);
+  mk.setEnabled(false);
+  return { q, mk };
+});
+for (const n of [sisa, yachaq]) {
+  mundo.choques.push({ x: n.raiz.position.x, z: n.raiz.position.z, r: 0.9 });
+  n.raiz.setEnabled(false);
+}
 // Región 2: la selva, Amaru y los ecos fantasma
 const selva = crearSelva(escena);
 const amaru = new Chaski(escena, true);
@@ -140,7 +162,7 @@ const yaruGuia = crearLlama(escena, 0, 0);
 yaruGuia.raiz.scaling.setAll(0.8);
 yaruGuia.raiz.setEnabled(false);
 let guiaActual: "amaru" | "killa" | "yaru" | null = null;
-type Region = "plaza" | "selva" | "valle" | "zona";
+type Region = "plaza" | "selva" | "valle" | "zona" | "mision";
 let region: Region = "plaza";
 document.body.dataset.region = "plaza";
 let personajes: Mesh[] = [];
@@ -168,6 +190,7 @@ for (const m of [asta, punta]) {
   m.isPickable = false;
 }
 function destinoGuia(): Vector3 | null {
+  if (region === "mision") return misionJuego.destino();
   if (region === "plaza") {
     const d = ataque.destino();
     if (d) return d;
@@ -193,7 +216,7 @@ function destinoGuia(): Vector3 | null {
 }
 
 // Lo que tapa al jugador se vuelve transparente
-const TAPAN = new Set(["casa", "techo", "puerta", "copa", "tronco", "anden", "pirqa"]);
+const TAPAN = new Set(["casa", "techo", "puerta", "copa", "tronco", "anden", "pirqa", "muro-templo", "banda-oro", "hornacina", "pilar", "lupuna", "copa-lupuna", "aleta"]);
 let transparentes: Mesh[] = [];
 
 // Escudo del prólogo (burbuja turquesa)
@@ -438,6 +461,7 @@ function ubicarEtiquetas() {
 function avanzar(paso: Paso) {
   estado.paso = paso;
   guardar();
+  mostrarNpcs();
   actualizarHud();
   ataque.prepararPaso();
   actualizarBotones();
@@ -501,6 +525,19 @@ async function reparar(clave: string) {
 
 async function hablarConMama() {
   if (region === "selva") return hablarConAmaru();
+  if (region === "plaza" && npcCercano) {
+    const q = npcCercano;
+    return enCalma(async () => {
+      await ofrecerMision(q);
+    });
+  }
+  if (region === "plaza" && llego("completo") && misionPara("mama") && !estado.misiones.oro) {
+    let acepto = false;
+    await enCalma(async () => {
+      acepto = await ofrecerMision("mama");
+    });
+    if (acepto) return;
+  }
   await enCalma(async () => {
     switch (estado.paso) {
       case "hablar1":
@@ -571,6 +608,7 @@ async function viajarA(destino: Region) {
   if (ojoAbierto) alternarOjo(false);
   if (region === "valle") valleJuego.salir();
   if (region === "plaza" && destino !== "plaza") ataque.salir();
+  if (region === "mision") misionJuego.salir();
   if (region === "zona" && destino !== "zona") {
     zonaJuego.salir();
     estado.zonaActual = "";
@@ -596,7 +634,8 @@ async function viajarA(destino: Region) {
   amaru.raiz.setEnabled(selvaActiva || guiaActual === "amaru");
   killa.raiz.setEnabled(guiaActual === "killa");
   yaruGuia.raiz.setEnabled(guiaActual === "yaru");
-  const inicio = selvaActiva ? INICIO_SELVA : valleActivo ? INICIO_VALLE : zonaActiva ? INICIO_ZONA : new Vector3(0, 0, -6);
+  const misionActiva = destino === "mision";
+  const inicio = selvaActiva ? INICIO_SELVA : valleActivo ? INICIO_VALLE : zonaActiva ? INICIO_ZONA : misionActiva ? INICIO_MISION : new Vector3(0, 0, -6);
   if (guiaActual) nodoGuia()!.position.copyFrom(inicio.add(new Vector3(2, 0, -1)));
   else amaru.raiz.position.copyFrom(AMARU_POS);
   chaski.raiz.position.copyFrom(inicio);
@@ -604,14 +643,25 @@ async function viajarA(destino: Region) {
   if (zona) zonaJuego.entrar(zona);
   fijarObjetivo(zona ? objetivoDeZona(zona) : null);
   if (plazaActiva) ataque.entrar();
+  mostrarNpcs();
+  if (misionActiva && misionActual) {
+    await misionJuego.entrar(misionActual);
+    fijarObjetivo(`${misionActual.exploracion.objetivo}: 0/${misionActual.exploracion.total}`);
+  }
   camara.target.copyFrom(chaski.raiz.position);
   escena.fogColor = zonaJuego.mundo ? zonaJuego.mundo.niebla : selvaActiva ? new Color3(0.55, 0.72, 0.55) : new Color3(0.72, 0.86, 0.95);
-  escena.fogStart = selvaActiva ? 28 : zona?.ambiente === "nubes" ? 22 : 45;
-  escena.fogEnd = selvaActiva ? 70 : zona?.ambiente === "nubes" ? 60 : 95;
+  escena.fogStart = selvaActiva ? 28 : zona?.ambiente === "nubes" ? 22 : plazaActiva ? 60 : 45;
+  escena.fogEnd = selvaActiva ? 70 : zona?.ambiente === "nubes" ? 60 : plazaActiva ? 150 : 95;
+  if (misionActiva && misionActual) {
+    const amb = misionActual.ambiente;
+    escena.fogColor = amb === "selva" ? new Color3(0.22, 0.32, 0.26) : amb === "puna" ? new Color3(0.78, 0.86, 0.95) : new Color3(0.8, 0.84, 0.9);
+    escena.fogStart = amb === "selva" ? 6 : 55;
+    escena.fogEnd = amb === "selva" ? 36 : 160;
+  }
   $("valle-titulo").textContent = zona ? `${zona.numero}. ${zona.nombre}` : "🌿 Naturaleza";
-  sol.intensity = selvaActiva ? 0.9 : 1.05;
+  sol.intensity = selvaActiva ? 0.9 : misionActiva && misionActual?.ambiente === "selva" ? 0.55 : 1.05;
   document.body.dataset.region = destino;
-  if (!zonaActiva) cambiarMusica(selvaActiva ? (batalla.activa ? "batalla" : "selva") : "andes");
+  if (!zonaActiva && !misionActiva) cambiarMusica(selvaActiva ? (batalla.activa ? "batalla" : "selva") : "andes");
   pintarLugar();
   actualizarBotones();
   await new Promise((r) => window.setTimeout(r, 200));
@@ -872,6 +922,11 @@ function nodoGuia() {
 async function irAlMapa() {
   const destino = await abrirMapa();
   if (!destino) return;
+  if (destino === "pueblo") {
+    await viajarA("plaza");
+    if (llego("completo")) aviso("🏘 Pueblo de Qhapaq: busca a quienes tienen ❗ para recibir misiones.", 3500);
+    return;
+  }
   if (destino === "valle") {
     if (yaPaso("valle")) await viajarA("valle");
     else await entrarValle();
@@ -960,14 +1015,92 @@ async function usarTaller() {
 // Botones de acción
 // ---------------------------------------------------------------------------
 let cercaDeMama = false;
+let npcCercano: "sisa" | "yachaq" | null = null;
 let liberable = false;
+// ---------------------------------------------------------------------------
+// MISIONES: alguien del pueblo te encarga una misión
+// ---------------------------------------------------------------------------
+let misionActual: Mision | null = null;
+const misionJuego = new MisionJuego({
+  escena,
+  chaski,
+  jugador: () => chaski.raiz.position,
+  sacudida,
+  aviso,
+  objetivo: (t) => fijarObjetivo(t),
+  cambio: () => actualizarBotones(),
+  terminar: (r) => void terminarMision(r),
+});
+
+/** La misión que encarga esta persona (si ya está disponible). */
+function misionPara(quien: "mama" | "sisa" | "yachaq"): Mision | null {
+  if (!llego("completo")) return null;
+  const m = MISIONES.find((x) => x.quien === quien);
+  if (!m) return null;
+  const anterior = MISIONES.find((x) => x.numero === m.numero - 1);
+  if (anterior && !estado.misiones[anterior.id]) return null;
+  return m;
+}
+
+function mostrarNpcs() {
+  const ver = region === "plaza" && !enPortada && llego("completo");
+  sisa.raiz.setEnabled(ver);
+  yachaq.raiz.setEnabled(ver);
+  for (const { mk } of marcadoresMision) mk.setEnabled(false);
+}
+
+async function ofrecerMision(quien: "mama" | "sisa" | "yachaq"): Promise<boolean> {
+  const m = misionPara(quien);
+  if (!m) {
+    const anterior = MISIONES.find((x) => x.quien === quien);
+    const previa = anterior ? MISIONES.find((x) => x.numero === anterior.numero - 1) : null;
+    await hablar([{ quien, texto: previa ? `Primero ayuda en la misión «${previa.nombre}». Después te necesitaré, {nombre}.` : "Vuelve pronto, {nombre}." }]);
+    return false;
+  }
+  if (quien !== "mama") (quien === "sisa" ? sisa : yachaq).gesto();
+  if (estado.misiones[m.id]) await hablar([{ quien, texto: `¡Gracias otra vez, {nombre}! ¿Quieres repetir «${m.nombre}» para sacar más estrellas?` }]);
+  else await hablar(m.pedido);
+  const acepta = await tarjetaMision(m);
+  if (!acepta) return false;
+  window.setTimeout(() => void iniciarMision(m), 50);
+  return true;
+}
+
+async function iniciarMision(m: Mision) {
+  misionActual = m;
+  await viajarA("mision");
+  aviso(`${m.icono} ${m.nombre}: ${m.exploracion.objetivo}. ¡Sigue la flecha!`, 3500);
+}
+
+async function terminarMision(r: { ganado: boolean; errores: number; golpes: number } | null) {
+  const m = misionActual;
+  if (!m) return;
+  if (!r) {
+    aviso("Volviste al pueblo. La misión te espera cuando quieras.", 3000);
+    await viajarA("plaza");
+    return;
+  }
+  const n = MisionJuego.estrellas(r);
+  MisionJuego.guardarResultado(m.id, n);
+  ganarKallpa(m.recompensa);
+  desbloquear(m.logro);
+  if (n === 3) desbloquear("tres-estrellas");
+  const eleccion = await resultadoMision(m, n, r.errores, r.golpes);
+  if (eleccion === "repetir") await viajarA("mision");
+  else {
+    await viajarA("plaza");
+    const siguiente = MISIONES.find((x) => x.numero === m.numero + 1);
+    if (siguiente && !estado.misiones[siguiente.id]) aviso(`❗ ${siguiente.quien === "sisa" ? "Sisa, la guardaparque" : "El abuelo Yachaq"} te busca: tiene una nueva misión.`, 4000);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // HUD como la referencia: lugar + objetivo, lista de objetivos con casillas y minimapa
 // ---------------------------------------------------------------------------
 function pintarLugar() {
   const zona = region === "zona" ? zonaJuego.zona : null;
   const [icono, titulo] =
-    region === "plaza" ? ["🏘", "PUEBLO DE QHAPAQ"] : region === "selva" ? ["🌿", "SELVA DE CH'AQWA"] : region === "valle" ? ["🏔", "VALLE SAGRADO"] : [zona?.sitios[0]?.icono ?? "📍", (zona?.nombre ?? "").toUpperCase()];
+    region === "plaza" ? ["🏘", "PUEBLO DE QHAPAQ"] : region === "selva" ? ["🌿", "SELVA DE CH'AQWA"] : region === "valle" ? ["🏔", "VALLE SAGRADO"] : region === "mision" ? [misionActual?.icono ?? "⚔", `MISIÓN: ${(misionActual?.nombre ?? "").toUpperCase()}`] : [zona?.sitios[0]?.icono ?? "📍", (zona?.nombre ?? "").toUpperCase()];
   $("lugar-icono").textContent = icono;
   $("lugar-titulo").textContent = titulo;
   $("minimapa").hidden = region !== "plaza";
@@ -985,6 +1118,7 @@ function listaObjetivos(): [string, boolean][] {
       ["Arma y escribe tu primera runa", yaPaso("taller")],
       ["Vence al Ch'aqwa Wawa", p.jefe || yaPaso("final")],
       ["Habla con Mama Khipu", llego("completo")],
+      ...MISIONES.map((m): [string, boolean] => [`${m.icono} Misión: ${m.nombre}`, !!estado.misiones[m.id]]),
     ];
   }
   if (region === "selva")
@@ -995,6 +1129,7 @@ function listaObjetivos(): [string, boolean][] {
       ["Derrota al Bug Ch'aqwa", yaPaso("batalla")],
       ["Habla con Amaru", llego("completo2")],
     ];
+  if (region === "mision") return misionJuego.listaObjetivos();
   if (region === "valle") return (Object.keys(NOMBRE_SITIO) as Sitio[]).map((s) => [`Rescata ${NOMBRE_SITIO[s]}`, estado.rescates.includes(s)]);
   const z = zonaJuego.zona;
   if (!z) return [];
@@ -1083,9 +1218,9 @@ function pintarMinimapa(dt: number) {
 
 function actualizarBotones() {
   pintarChecklist();
-  const abierto = region === "valle" || region === "zona";
+  const abierto = region === "valle" || region === "zona" || (region === "mision" && misionJuego.fase === "explorar");
   const enPlaza = region === "plaza";
-  $("boton-hablar").hidden = !cercaDeMama || ocupado || batalla.activa || abierto || (enPlaza && ataque.mamaAtrapada);
+  $("boton-hablar").hidden = !(cercaDeMama || npcCercano) || ocupado || batalla.activa || abierto || (enPlaza && ataque.mamaAtrapada);
   $("boton-huaraca").hidden = !(abierto || (enPlaza && ataque.armado));
   const liberar = enPlaza && liberable;
   $("boton-rescatar").hidden = !(liberar || (region === "valle" ? sitioActual : region === "zona" ? altarActual : null)) || ocupado;
@@ -1154,6 +1289,7 @@ $("boton-huaraca").addEventListener("pointerdown", (e) => {
   e.preventDefault();
   if (ocupado || dialogoAbierto()) return;
   if (region === "plaza") ataque.disparar(adelanteDeChaski());
+  else if (region === "mision") misionJuego.disparar(adelanteDeChaski());
   else if (region === "zona") zonaJuego.disparar(adelanteDeChaski());
   else valleJuego.disparar(adelanteDeChaski());
 });
@@ -1248,6 +1384,7 @@ window.addEventListener("keydown", (e) => {
   if (k === "t" && !$("boton-taller").hidden) enCalma(usarTaller);
   if (k === "q") enCalma(abrirSimiQillqa);
   if (k === "f" && region === "plaza") ataque.disparar(adelanteDeChaski());
+  if (k === "f" && region === "mision") misionJuego.disparar(adelanteDeChaski());
   if (k === "r" && region === "plaza") void ataque.usarRuna();
   if (k === "f" && region === "valle") valleJuego.disparar(adelanteDeChaski());
   if (k === "f" && region === "zona") zonaJuego.disparar(adelanteDeChaski());
@@ -1293,7 +1430,7 @@ function medir() {
 let jugando = false;
 escena.onBeforeRenderObservable.add(() => {
   const dt = Math.min(motor.getDeltaTime() / 1000, 0.05);
-  const bloqueado = !jugando || ocupado || dialogoAbierto() || zonaJuego.preguntando || ataque.preguntando;
+  const bloqueado = !jugando || ocupado || dialogoAbierto() || zonaJuego.preguntando || ataque.preguntando || misionJuego.enDuelo;
   let dx = bloqueado ? 0 : entrada.x;
   let dz = bloqueado ? 0 : -entrada.y;
   if (!bloqueado) {
@@ -1312,9 +1449,9 @@ escena.onBeforeRenderObservable.add(() => {
   pos.z += dz * VELOCIDAD * dt;
   resolverChoques(
     pos,
-    region === "selva" ? selva.choques : region === "valle" ? valle.choques : region === "zona" ? zonaJuego.mundo?.choques ?? [] : mundo.choques,
+    region === "selva" ? selva.choques : region === "valle" ? valle.choques : region === "zona" ? zonaJuego.mundo?.choques ?? [] : region === "mision" ? misionJuego.choques : mundo.choques,
     0.45,
-    region === "selva" ? LIMITE_SELVA : region === "valle" ? LIMITE_VALLE : region === "zona" ? LIMITE_ZONA : undefined
+    region === "selva" ? LIMITE_SELVA : region === "valle" ? LIMITE_VALLE : region === "zona" ? LIMITE_ZONA : region === "mision" ? LIMITE_MISION : undefined
   );
   // El guía acompaña al jugador en el viaje
   const acompanante = nodoGuia();
@@ -1350,6 +1487,7 @@ escena.onBeforeRenderObservable.add(() => {
     }
   }
   pintarMinimapa(dt);
+  if (region === "mision") misionJuego.actualizar(dt, !jugando || ocupado || dialogoAbierto());
   listaCada -= dt;
   if (listaCada <= 0) {
     listaCada = 0.5;
@@ -1403,11 +1541,15 @@ escena.onBeforeRenderObservable.add(() => {
     }
   } else {
     camara.alpha += (-Math.PI / 2 - camara.alpha) * Math.min(1, dt * 4);
-    camara.targetScreenOffset.scaleInPlace(1 - Math.min(1, dt * 4));
-    camara.beta += (betaBase - camara.beta) * Math.min(1, dt * 4);
+    if (misionJuego.enDuelo) {
+      const vert = document.body.classList.contains("vertical");
+      camara.targetScreenOffset.x += ((vert ? 0 : 4.2) - camara.targetScreenOffset.x) * Math.min(1, dt * 3);
+      camara.targetScreenOffset.y += ((vert ? 3 : -0.8) - camara.targetScreenOffset.y) * Math.min(1, dt * 3);
+    } else camara.targetScreenOffset.scaleInPlace(1 - Math.min(1, dt * 4));
+    camara.beta += ((misionJuego.enDuelo ? 1.12 : betaBase) - camara.beta) * Math.min(1, dt * 4);
     camara.target.copyFrom(Vector3.Lerp(camara.target, pos.add(new Vector3(0, 1.2, 0)), Math.min(1, dt * 6)).add(sacudida.tomar(dt)));
     // Cámara de cine: se acerca durante los diálogos
-    const radioObjetivo = dialogoAbierto() ? radioBase * 0.72 : radioBase;
+    const radioObjetivo = misionJuego.enDuelo ? 12 : dialogoAbierto() ? radioBase * 0.72 : radioBase;
     camara.radius += (radioObjetivo - camara.radius) * Math.min(1, dt * 3);
   }
   // Flecha guía
@@ -1454,7 +1596,20 @@ escena.onBeforeRenderObservable.add(() => {
   }
   if (estado.palabras.length >= 6) desbloquear("simi");
 
-  const cerca = jugando && region !== "valle" && Vector3.Distance(pos, region === "selva" ? AMARU_POS : MAMA_POS) < 3.8;
+  const cerca = jugando && (region === "plaza" || region === "selva") && Vector3.Distance(pos, region === "selva" ? AMARU_POS : MAMA_POS) < 3.8;
+  const npc = jugando && region === "plaza" && llego("completo") ? ((["sisa", "yachaq"] as const).find((q) => Vector3.Distance(pos, NPC_POS[q]) < 3.4) ?? null) : null;
+  if (npc !== npcCercano) {
+    npcCercano = npc;
+    actualizarBotones();
+  }
+  if (jugando && region === "plaza") {
+    mirarSuave(sisa.raiz, pos, dt, 6);
+    mirarSuave(yachaq.raiz, pos, dt, 6);
+    for (const { q, mk } of marcadoresMision) {
+      mk.setEnabled(!enPortada && !!misionPara(q) && !estado.misiones[misionPara(q)!.id]);
+      mk.position.y = 3.5 + Math.sin(performance.now() / 300) * 0.12;
+    }
+  }
   if (cerca !== cercaDeMama) {
     cercaDeMama = cerca;
     actualizarBotones();
@@ -1565,6 +1720,7 @@ function modoPortada(activa: boolean) {
   mundo.cupula.setEnabled(!activa);
   for (const n of mundo.nubes) n.setEnabled(!activa);
   mama.raiz.setEnabled(plaza);
+  mostrarNpcs();
   yaru.raiz.setEnabled(plaza);
   for (const l of llamasPueblo) l.raiz.setEnabled(plaza);
   marcador.setEnabled(plaza);
@@ -1594,6 +1750,7 @@ modoPortada(true);
 
 async function empezar() {
   if (enPortada) modoPortada(false);
+  mostrarNpcs();
   revisarRacha();
   despertarAudio();
   iniciarMusica();
@@ -1728,8 +1885,48 @@ restaurarMundo();
     killa.vestir(mk);
     const ma = await crearModelo(escena, "amaru.glb", amaru.raiz, 2.7);
     amaru.vestir(ma, ma.cabeza ? ponerMontera(escena, ma.cabeza, 0.85) : []);
+    // Sisa (guardaparque) y el abuelo Yachaq: mismos modelos con otros colores y sombreros
+    const tenir = (mallas: Mesh[], color: Color3) => {
+      for (const malla of mallas) {
+        if (malla.material instanceof StandardMaterial) {
+          const c = malla.material.clone(`${malla.material.name}-${color.toHexString()}`);
+          c.diffuseColor = color;
+          malla.material = c;
+        }
+      }
+    };
+    const sombrero = (cabeza: TransformNode | null, color: string, ala: number) => {
+      if (!cabeza) return [];
+      const m = material(escena, color);
+      const a = MeshBuilder.CreateCylinder("sombrero-ala", { height: 0.06, diameter: ala, tessellation: 20 }, escena);
+      a.material = m;
+      a.parent = cabeza;
+      a.position.y = 0.74;
+      const c = MeshBuilder.CreateCylinder("sombrero-copa", { height: 0.36, diameterTop: 0.6, diameterBottom: 0.72, tessellation: 16 }, escena);
+      c.material = m;
+      c.parent = cabeza;
+      c.position.y = 0.92;
+      return [a, c];
+    };
+    const ms = await crearModelo(escena, "killa.glb", sisa.raiz, 2.6);
+    tenir(ms.mallas as Mesh[], new Color3(0.85, 0.95, 0.7));
+    sisa.vestir(ms, sombrero(ms.cabeza, "#6b5a32", 1.3));
+    const my = await crearModelo(escena, "amaru.glb", yachaq.raiz, 2.5);
+    tenir(my.mallas as Mesh[], new Color3(0.95, 0.85, 0.75));
+    yachaq.vestir(my, sombrero(my.cabeza, "#4a3a2a", 1.15));
+    mostrarNpcs();
     listarPersonajes();
     aplicarCalidad(calidad);
+    // Paisaje 3D del pueblo (montañas, colinas con bosque, árboles y rocas KayKit CC0)
+    try {
+      const extra = await poblar(escena, mundo.paisaje);
+      for (const m of extra) {
+        mundo.mallas.push(m);
+        m.setEnabled(region === "plaza" && !enPortada);
+      }
+    } catch (e) {
+      console.warn("Paisaje no disponible", e);
+    }
     (window as unknown as Record<string, unknown>).__modelos = true;
   } catch (error) {
     console.warn("No se cargaron los modelos 3D; se usan los personajes simples.", error);
@@ -1756,6 +1953,11 @@ if (new URLSearchParams(location.search).has("prueba")) {
     valle: { bugsVivos: () => ({ cerca: region === "zona" ? zonaJuego.bugsCerca() : valleJuego.bugsCerca() }) },
     zj: zonaJuego,
     pueblo: ataque.prueba,
+    mision: misionJuego.prueba,
+    iniciarMision: (id: string) => {
+      const m = MISIONES.find((x) => x.id === id);
+      if (m) void iniciarMision(m);
+    },
     fotoRetrato: (clave: string) => {
       fotoClave = clave;
       document.body.classList.add("modo-foto");

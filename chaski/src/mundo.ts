@@ -9,6 +9,17 @@ import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTextur
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { material } from "./personajes";
+import { texturaPasto, texturaAdobe, texturaTejas, texturaPiedraInca } from "./texturas";
+import type { Colocacion } from "./paisaje";
+
+function conTextura(escena: Scene, nombre: string, tex: StandardMaterial["diffuseTexture"], color = "#ffffff") {
+  const m = new StandardMaterial(nombre, escena);
+  m.diffuseTexture = tex;
+  m.diffuseColor = Color3.FromHexString(color);
+  m.specularColor = new Color3(0.04, 0.04, 0.04);
+  m.emissiveColor = Color3.FromHexString(color).scale(0.06);
+  return m;
+}
 
 export interface Choque {
   x: number;
@@ -38,11 +49,14 @@ export function crearMundo(escena: Scene) {
 
   // Suelo de pasto y plaza de piedra
   const pasto = agrega(MeshBuilder.CreateGround("pasto", { width: 140, height: 140 }, escena));
-  pasto.material = material(escena, "#4f9a3f");
+  pasto.material = conTextura(escena, "m-pasto", texturaPasto(escena, "#5c9a43", 22));
+  const paisaje: Colocacion[] = [];
   const plaza = agrega(MeshBuilder.CreateDisc("plaza", { radius: 10, tessellation: 40 }, escena));
   plaza.rotation.x = Math.PI / 2;
   plaza.position.y = 0.02;
-  plaza.material = material(escena, "#b9a07c");
+  const empedrado = texturaPiedraInca(escena);
+  empedrado.uScale = empedrado.vScale = 5;
+  plaza.material = conTextura(escena, "m-plaza", empedrado, "#e9dcc4");
   const anillo = agrega(MeshBuilder.CreateTorus("borde", { diameter: 20, thickness: 0.35, tessellation: 48 }, escena));
   anillo.position.y = 0.05;
   anillo.material = material(escena, "#a8916f");
@@ -50,7 +64,10 @@ export function crearMundo(escena: Scene) {
   for (const [x, z, w, d] of [[0, 17, 3.2, 14], [0, -17, 3.2, 14], [17, 0, 14, 3.2], [-17, 0, 14, 3.2]]) {
     const camino = agrega(MeshBuilder.CreateGround("camino", { width: w, height: d }, escena));
     camino.position.set(x, 0.015, z);
-    camino.material = material(escena, "#c9a774");
+    const tx = texturaPiedraInca(escena).clone();
+    tx.uScale = w / 4;
+    tx.vScale = d / 4;
+    camino.material = conTextura(escena, `m-camino-${x}-${z}`, tx, "#e3d2b0");
   }
 
   // Fuente con el símbolo del Inti
@@ -77,15 +94,19 @@ export function crearMundo(escena: Scene) {
   const casas: [number, number, number][] = [
     [-12, 12, 0.6], [12, 12, -0.6], [-13, -11, 2.4], [13, -11, -2.4], [-20, 3, 1.57], [20, -4, -1.57],
   ];
+  const adobe = conTextura(escena, "m-adobe", texturaAdobe(escena), "#ffffff");
+  const techoMats: Record<string, StandardMaterial> = {};
+  const tejas = texturaTejas(escena);
+  for (const [n, c] of Object.entries({ gris: "#8d8d95", rojo: "#c2492f", azul: "#2f6fd1", verde: "#3f8f3a" })) techoMats[n] = conTextura(escena, `m-techo-${n}`, tejas, c);
   casas.forEach(([x, z, giro], i) => {
     const muro = agrega(MeshBuilder.CreateBox("casa", { width: 4.4, height: 2.6, depth: 3.6 }, escena));
     muro.position.set(x, 1.3, z);
     muro.rotation.y = giro;
-    muro.material = material(escena, i % 2 ? "#efe3cf" : "#e8cf9f");
+    muro.material = adobe;
     const techo = agrega(MeshBuilder.CreateCylinder("techo", { height: 1.7, diameterTop: 0, diameterBottom: 5.6, tessellation: 4 }, escena));
     techo.position.set(x, 3.45, z);
     techo.rotation.y = giro + Math.PI / 4;
-    techo.material = material(escena, "#b8432f");
+    techo.material = techoMats.gris;
     techos.push(techo);
     const puerta = agrega(MeshBuilder.CreateBox("puerta", { width: 1, height: 1.7, depth: 0.1 }, escena));
     puerta.parent = muro;
@@ -108,8 +129,8 @@ export function crearMundo(escena: Scene) {
   // Montañas (apus) con nieve
   for (let i = 0; i < 14; i++) {
     const angulo = (i / 14) * Math.PI * 2 + 0.2;
-    const distancia = 62 + azar(i) * 14;
-    const alto = 22 + azar(i + 7) * 20;
+    const distancia = 92 + azar(i) * 16;
+    const alto = 38 + azar(i + 7) * 26;
     const monte = agrega(MeshBuilder.CreateCylinder("apu", { height: alto, diameterTop: 0, diameterBottom: alto * 1.5, tessellation: 7 }, escena));
     monte.position.set(Math.sin(angulo) * distancia, alto / 2 - 1, Math.cos(angulo) * distancia);
     monte.material = material(escena, i % 2 ? "#6f8f5a" : "#7c8f6a");
@@ -129,24 +150,40 @@ export function crearMundo(escena: Scene) {
     if (choques.some((c) => Math.hypot(c.x - x, c.z - z) < c.r + 1.6)) continue;
     k++;
     if (azar(i * 9.1) > 0.75) {
-      const roca = agrega(MeshBuilder.CreateSphere("roca", { diameter: 1.2 + azar(i) * 0.8, segments: 6 }, escena));
-      roca.scaling.y = 0.6;
-      roca.position.set(x, 0.3, z);
-      roca.material = material(escena, "#9a9389");
-      choques.push({ x, z, r: 0.8 });
+      paisaje.push({ modelo: azar(i) > 0.5 ? "rock_single_E" : "rock_single_C", x, z, escala: 4.5 + azar(i * 2) * 2, giro: azar(i * 4) * 6.28 });
+      choques.push({ x, z, r: 0.9 });
       continue;
     }
-    const tronco = agrega(MeshBuilder.CreateCylinder("tronco", { height: 1.6, diameter: 0.36, tessellation: 6 }, escena));
-    tronco.position.set(x, 0.8, z);
-    tronco.material = material(escena, "#7a4b2a");
-    for (let j = 0; j < 3; j++) {
-      const copa = agrega(MeshBuilder.CreateSphere("copa", { diameter: 1.6 - j * 0.3, segments: 8 }, escena));
-      copa.position.set(x + (j - 1) * 0.35, 2.0 + j * 0.45, z + (j % 2) * 0.3);
-      copa.material = material(escena, j % 2 ? "#3f8f3a" : "#2f7a32");
-    }
+    paisaje.push({ modelo: azar(i * 1.7) > 0.5 ? "tree_single_A" : "tree_single_B", x, z, escala: 2.8 + azar(i * 3) * 0.9, giro: azar(i * 6) * 6.28 });
     choques.push({ x, z, r: 0.6 });
   }
   void k;
+  // Colinas con bosque alrededor del pueblo (fuera del área caminable)
+  for (let i = 0; i < 22; i++) {
+    const a = (i / 22) * Math.PI * 2 + azar(i * 3.3) * 0.2;
+    const d = 31 + azar(i * 4.1) * 9;
+    const x = Math.sin(a) * d;
+    const z = Math.cos(a) * d;
+    if (z > 24 && Math.abs(x) < 22) continue; // los andenes del fondo quedan libres
+    paisaje.push({ modelo: ["hills_A_trees", "hills_B_trees", "hills_C_trees"][i % 3], x, z, escala: 6.5 + azar(i) * 2.5, giro: azar(i * 7) * 6.28 });
+  }
+  // Bosquecitos entre las casas y el borde
+  for (let i = 0; i < 14; i++) {
+    const a = (i / 14) * Math.PI * 2 + 0.3;
+    const d = 26 + azar(i * 9.7) * 3;
+    paisaje.push({ modelo: i % 2 ? "trees_A_medium" : "trees_B_medium", x: Math.sin(a) * d, z: Math.cos(a) * d, escala: 3.6, giro: azar(i) * 6.28 });
+  }
+  // Montañas verdes con árboles (cerros cercanos) y rocas grandes
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2 + azar(i * 2.2) * 0.25;
+    const d = 54 + azar(i * 3.9) * 14;
+    paisaje.push({ modelo: ["mountain_A_grass_trees", "mountain_B_grass_trees", "mountain_C_grass_trees"][i % 3], x: Math.sin(a) * d, z: Math.cos(a) * d, escala: 13 + azar(i) * 5, alto: 1.2 + azar(i * 5) * 0.5, giro: azar(i * 8) * 6.28 });
+  }
+  for (let i = 0; i < 10; i++) {
+    const a = azar(i * 13.1) * Math.PI * 2;
+    const d = 27 + azar(i * 2.7) * 6;
+    paisaje.push({ modelo: "resource_stone", x: Math.sin(a) * d, z: Math.cos(a) * d, escala: 5, giro: azar(i) * 6.28 });
+  }
 
   // Cielo con degradado (cúpula) y nubes que pasan
   const cieloMat = new StandardMaterial("m-cielo", escena);
@@ -248,11 +285,8 @@ export function crearMundo(escena: Scene) {
     });
   });
 
-  const gris = material(escena, "#7d7d85");
-  const rojo = material(escena, "#b8432f");
-  const azul = material(escena, "#2f6fd1");
-  const verde = material(escena, "#3f8f3a");
-  const coloresTecho: Record<string, typeof rojo> = { gris, rojo, azul, verde };
+  const coloresTecho = techoMats;
+  const gris = techoMats.gris;
   const intiOro = inti.material;
   const intiApagado = material(escena, "#6f6a62");
 
@@ -279,7 +313,7 @@ export function crearMundo(escena: Scene) {
     },
   };
 
-  return { mallas, choques, leibles, control, glitches, cupula, nubes };
+  return { mallas, choques, leibles, control, glitches, cupula, nubes, paisaje };
 }
 
 /** Empuja la posición fuera de los objetos sólidos y dentro del límite del mapa. */
