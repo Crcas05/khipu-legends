@@ -187,7 +187,7 @@ export function abrirTaller(r: Reto): Promise<boolean | "ayuda"> {
         if (fallos >= 3 && r.solucion) botonSolucion.hidden = false;
         return decir(html, "mal");
       };
-      consola.innerHTML = visibles.length ? visibles.map((l) => `<div>${escapar(l)}</div>`).join("") : '<span class="gris">(tu runa no mostró nada)</span>';
+      consola.innerHTML = visibles.length ? salidaHtml(visibles) : '<span class="gris">(tu runa no mostró nada)</span>';
 
       if (!res.ok && res.error) {
         const falta = (res.error.mensaje.match(/name '([^']+)' is not defined/) || [])[1];
@@ -204,4 +204,31 @@ export function abrirTaller(r: Reto): Promise<boolean | "ayuda"> {
       botonEjecutar.classList.add("listo");
     });
   });
+}
+
+/** Muestra la salida; los resultados de SQL (cabecera | ... / -+- / filas / (N filas)) se ven como tabla. */
+function salidaHtml(lineas: string[]): string {
+  const html: string[] = [];
+  let i = 0;
+  while (i < lineas.length) {
+    const sep = lineas[i + 1];
+    if (sep !== undefined && /^-+(-\+-+)*$/.test(sep.trim()) && sep.trim().length > 0) {
+      const cab = lineas[i].split(" | ").map((c) => c.trim());
+      const filas: string[][] = [];
+      let j = i + 2;
+      while (j < lineas.length && !/^\(\d+ filas?\)$/.test(lineas[j].trim())) {
+        filas.push(lineas[j].split(" | ").map((c) => c.trim()));
+        j++;
+      }
+      const pie = j < lineas.length ? lineas[j].trim() : "";
+      html.push(`<div class="tabla-sql-marco"><b>Resultado:</b><table class="tabla-sql"><thead><tr>${cab.map((c) => `<th>${escapar(c)}</th>`).join("")}</tr></thead><tbody>${filas
+        .map((f) => `<tr>${f.map((c) => `<td>${escapar(c)}</td>`).join("")}</tr>`)
+        .join("")}</tbody></table>${pie ? `<small>${escapar(pie)}</small>` : ""}</div>`);
+      i = j + 1;
+      continue;
+    }
+    html.push(`<div>${escapar(lineas[i])}</div>`);
+    i++;
+  }
+  return html.join("");
 }

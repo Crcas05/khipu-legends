@@ -9,6 +9,9 @@ import { PROGRAMA, ZONAS } from "../datos/zonas";
 
 export const LOGROS: Record<string, { icono: string; nombre: string; texto: string }> = {
   prologo: { icono: "🌅", nombre: "Primeras runas", texto: "Aprendiste 4 conceptos en un minuto" },
+  defensa: { icono: "🛡", nombre: "Defensor del yaku", texto: "Salvaste la fuente de la oleada de mini-Bugs" },
+  vecinos: { icono: "🫧", nombre: "Rescatista", texto: "Liberaste a todas las llamas de sus burbujas" },
+  wawa: { icono: "🐛", nombre: "Primer jefe", texto: "Venciste al Ch'aqwa Wawa con runas y huaraca" },
   ojo: { icono: "👁", nombre: "Primer vistazo", texto: "Abriste el Ojo del Khipukamayuq" },
   fuente: { icono: "💧", nombre: "Guardián del yaku", texto: "Reparaste la fuente con True" },
   techo: { icono: "🏠", nombre: "Pintor de wasis", texto: "Usaste tu primer texto (str)" },
@@ -44,6 +47,12 @@ function siguiente() {
     return;
   }
   mostrando = true;
+  // Si está la pantalla de ¡Nuevo nivel!, la insignia espera su turno (no tapa el título)
+  if (!document.getElementById("nivel")!.hidden) {
+    cola.unshift(clave);
+    window.setTimeout(siguiente, 800);
+    return;
+  }
   const l = LOGROS[clave];
   caja.innerHTML = `<span class="logro-icono">${l.icono}</span><div><small>¡INSIGNIA DESBLOQUEADA!</small><b>${l.nombre}</b><span>${l.texto}</span></div>`;
   caja.hidden = false;

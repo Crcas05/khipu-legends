@@ -8,34 +8,42 @@
   <title>Chaski Runes · Guardianes del Código</title>
 </head>
 <body>
+  <div id="fondo-portada"></div>
   <canvas id="lienzo" touch-action="none"></canvas>
   <div id="etiquetas"></div>
 
   <!-- Portada -->
   <section id="portada">
-    <img class="portada-arte" src="arte/portada.jpg" alt="" onerror="this.remove()">
+    <img class="portada-arte" src="arte/portada.jpg" alt="" onload="document.body.classList.add('con-arte')" onerror="this.remove()">
     <pre class="portada-codigo" id="portada-codigo"></pre>
-    <div class="logo">
-      <span class="logo-1">CHASKI</span>
-      <span class="logo-2">RUNES</span>
-      <span class="logo-sub">Aprende Python y SQL mientras juegas</span>
+    <div class="portada-izq">
+      <div class="logo">
+        <svg class="logo-inti" viewBox="-60 -60 120 120" aria-hidden="true"><g fill="#f5b83d" stroke="#7a3a12" stroke-width="3"><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(0)"/><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(30)"/><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(60)"/><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(90)"/><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(120)"/><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(150)"/><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(180)"/><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(210)"/><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(240)"/><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(270)"/><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(300)"/><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(330)"/></g><circle r="26" fill="#ffd166" stroke="#7a3a12" stroke-width="4"/><circle r="17" fill="none" stroke="#c8102e" stroke-width="3"/><path d="M-8 -3 h5 M3 -3 h5 M-6 7 q6 5 12 0" stroke="#7a3a12" stroke-width="3" fill="none" stroke-linecap="round"/></svg>
+        <span class="logo-1">CHASKI</span>
+        <span class="logo-2">RUNES</span>
+        <span class="logo-sub">Aprende Python y SQL<br>mientras juegas</span>
+      </div>
+      <button id="boton-jugar" class="boton-oro boton-jugar-grande">▶ JUGAR</button>
+      <nav class="menu-portada">
+        <button id="menu-mapa" hidden><i>🗺</i><span>MAPA DEL VIAJE</span></button>
+        <button id="menu-historia"><i>📜</i><span>HISTORIA</span></button>
+        <button id="menu-personajes"><i>🦸</i><span>PERSONAJES</span></button>
+        <button id="menu-logros"><i>🏆</i><span>LOGROS</span></button>
+        <button id="menu-ajustes"><i>⚙</i><span>CONFIGURACIÓN</span></button>
+      </nav>
+      <p class="nota" id="portada-progreso">Una aventura por el Perú · Python y SQL</p>
+      <button id="boton-nueva" class="enlace-nueva" hidden>Empezar una partida nueva</button>
     </div>
-    <button id="boton-jugar" class="boton-oro boton-jugar-grande">▶ JUGAR</button>
-    <nav class="menu-portada">
-      <button id="menu-mapa" hidden>🗺<span>MAPA</span></button>
-      <button id="menu-personajes">🦸<span>PERSONAJES</span></button>
-      <button id="menu-logros">🏆<span>LOGROS</span></button>
-      <button id="menu-ajustes">⚙<span>AJUSTES</span></button>
-    </nav>
-    <p class="nota" id="portada-progreso">Una aventura por el Perú · Python y SQL</p>
-    <button id="boton-nueva" class="enlace-nueva" hidden>Empezar una partida nueva</button>
+    <div class="franja-lema">CONOCIMIENTO<br>QUE TE LLEVA MÁS LEJOS</div>
   </section>
 
   <section id="seleccion" class="desplazable" hidden></section>
 
   <!-- Interfaz del juego -->
   <div id="hud" hidden>
-    <div class="panel objetivo" id="objetivo"><span class="objetivo-icono">🎯</span><span id="objetivo-texto"></span></div>
+    <div class="panel objetivo" id="objetivo"><span class="objetivo-icono" id="lugar-icono">🏘</span><div class="objetivo-cuerpo"><b id="lugar-titulo">PUEBLO DE QHAPAQ</b><span id="objetivo-texto"></span></div></div>
+    <div class="panel checklist" id="checklist" hidden><b>OBJETIVO</b><ul id="checklist-lista"></ul></div>
+    <canvas id="minimapa" width="240" height="240" hidden></canvas>
     <div class="chips">
       <span class="chip" id="chip-racha" title="Racha de días jugando" hidden>🔥 <b id="hud-racha">0</b></span>
       <span class="chip" title="Nivel">⭐ <b id="hud-nivel">1</b></span>
@@ -60,6 +68,11 @@
     <b id="jefe-zona-nombre">🐛 Jefe</b>
     <div class="barra roja"><i id="jefe-zona-vida"></i></div>
     <code id="jefe-zona-estado">escudo = True</code>
+  </div>
+
+  <div class="panel" id="hud-pueblo" hidden>
+    <b>❤</b><div class="barra mini"><i id="vida-pueblo"></i></div>
+    <span id="runa-carga">🔮 ◇◇◇◇</span>
   </div>
 
   <div class="panel ajustes" id="ajustes" hidden>
@@ -96,6 +109,7 @@
     <button id="boton-rescatar" class="boton-redondo rescatar" hidden>🔧<br>RESCATAR</button>
     <button id="boton-hablar" class="boton-redondo hablar" hidden>💬<br>HABLAR</button>
     <button id="boton-huaraca" class="boton-redondo huaraca" hidden>🎯<br>HUARACA</button>
+    <button id="boton-runa" class="boton-redondo runa" hidden>🔮<br>RUNA</button>
     <button id="boton-taller" class="boton-redondo taller" hidden>📜<br>TALLER</button>
     <button id="boton-accion" class="boton-redondo ojo" aria-label="Abrir el Ojo">👁<br>OJO</button>
   </div>

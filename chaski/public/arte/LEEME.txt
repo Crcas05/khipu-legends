@@ -1,7 +1,12 @@
-Ilustraciones del juego (opcionales). Si subes un archivo con estos nombres, el juego lo usa solo:
+Arte del juego (opcional). Si subes un archivo con estos nombres, el juego lo usa solo:
 
-  portada.jpg     Fondo de la portada (horizontal, 1600 x 900 aprox.)
-  mapa-peru.jpg   Mapa ilustrado del Perú para "El viaje del Chaski" (vertical 3:4, 1200 x 1600 aprox.)
+  portada.jpg        -> ilustración de portada (16:9, sin texto, izquierda vacía para el menú).
+                        Si no existe, se usa fondo-portada.jpg (Machu Picchu dibujado) + héroes 3D.
+  heroe-chaski.png   -> retrato de la tarjeta de Chaski  (vertical 4:5, fondo transparente o liso)
+  heroe-amaru.png    -> retrato de Amaru
+  heroe-killa.png    -> retrato de Killa
+  heroe-yaru.png     -> retrato de Yaru
+  mapa-peru.jpg      -> ilustración del mapa del viaje (vertical 3:4)
 
-Las posiciones de las zonas en el mapa están en src/datos/zonas.ts (campo "mapa", en %).
-Revisa que la licencia de tu herramienta de imágenes permita publicarlas.
+Las imágenes que vienen incluidas las hizo el propio juego (modelos 3D KayKit CC0 y dibujo vectorial propio).
+Si usas imágenes hechas con IA, revisa que la licencia de la herramienta permita usarlas en tu juego.

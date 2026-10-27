@@ -44,6 +44,7 @@ export const PALABRAS: Record<string, string> = {
 };
 
 export const OBJETIVOS: Record<string, string> = {
+  intro: "¡Defiende la fuente! Dispara a los mini-Bugs con 🎯",
   hablar1: "Habla con Mama Khipu: sigue la flecha dorada ➜",
   fuente: "Ve a la fuente, toca 👁 OJO y luego su código",
   techo: "Sigue la flecha a la casa y toca su código con el 👁 OJO",
@@ -59,7 +60,7 @@ export const INTRO: Linea[] = [
 ];
 
 export const MAMA_1: Linea[] = [
-  { quien: "mama", texto: "[[Allillanchu]], {nombre}. Tuki me contó que ya usaste tus primeras runas. ¡Qué bueno que llegaste!" },
+  { quien: "mama", texto: "[[Allillanchu]], {nombre}. Tuki me contó que ya usaste tus primeras runas. ¡Y peleaste como un verdadero chaski!" },
   { quien: "mama", texto: "El Bug Ch'aqwa desordenó las cuerdas de nuestro pueblo. Mira la fuente: el [[yaku]] ya no corre." },
   { quien: "mama", texto: "Te entrego el Ojo del Khipukamayuq. Ábrelo y mira la fuente." },
   { quien: "tuki", texto: "Toca el botón 👁 OJO y después toca el código que brilla sobre la fuente. ¡Kraa!" },

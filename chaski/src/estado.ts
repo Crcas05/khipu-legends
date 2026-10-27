@@ -36,12 +36,14 @@ export interface Estado {
   tesoros: string[];
   /** Leer los diálogos en voz alta. */
   voz: boolean;
+  /** Episodio 1 con acción: oleada, rescates, guardianes y mini-jefe. */
+  pueblo: { ola: boolean; mama: boolean; vecinos: string[]; guardias: string[]; jefe: boolean };
 }
 
 const CLAVE = "chaski-runes-v1";
 
 function inicial(): Estado {
-  return { heroe: "", nombre: "", paso: "prologo", kallpa: 0, exp: 0, nivel: 1, palabras: [], codigo: "", logros: [], nudos: [], runas: {}, racha: 0, ultimoDia: "", rescates: [], inventario: {}, zonas: {}, sellos: {}, leccionPaso: {}, zonaActual: "", jefes: [], ayudas: [], tesoros: [], voz: false };
+  return { heroe: "", nombre: "", paso: "prologo", kallpa: 0, exp: 0, nivel: 1, palabras: [], codigo: "", logros: [], nudos: [], runas: {}, racha: 0, ultimoDia: "", rescates: [], inventario: {}, zonas: {}, sellos: {}, leccionPaso: {}, zonaActual: "", jefes: [], ayudas: [], tesoros: [], voz: false, pueblo: { ola: false, mama: false, vecinos: [], guardias: [], jefe: false } };
 }
 
 function cargar(): Estado {

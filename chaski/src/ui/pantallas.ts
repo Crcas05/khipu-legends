@@ -66,13 +66,14 @@ export function elegirHeroe(soloVer = false): Promise<string> {
   const pintar = () => {
     caja.innerHTML = `
       <div class="seleccion-marco">
-        <h2>SELECCIONA TU HÉROE</h2>
+        <div class="seleccion-monedas"><span>⚡ ${estado.kallpa}</span><span>⭐ Nivel ${estado.nivel}</span></div>
+        <h2>SELECCIONA TU PERSONAJE</h2>
         <div class="seleccion-cuerpo">
           <div class="tarjetas">
             ${HEROES.map(
               (h) => `
               <button class="tarjeta-heroe ${h === elegido ? "activa" : ""} ${h.desbloqueo ? "bloqueada" : ""}" data-clave="${h.clave}">
-                ${retrato(h.clave, 92)}
+                <span class="foto-heroe" data-svg='${retrato(h.clave, 104).replace(/'/g, "&#39;")}'><img src="${import.meta.env.BASE_URL}arte/heroe-${h.clave}.png" alt="" onerror="this.parentElement.innerHTML=this.parentElement.dataset.svg" ></span>
                 <b>${h.nombre}</b><small>${h.rol}</small>
                 ${h.desbloqueo ? `<span class="candado">🔒</span>` : ""}
               </button>`
@@ -120,8 +121,9 @@ export function nuevoNivel(aprendido: string[]): Promise<void> {
     <div class="nivel-marco">
       <div class="rayos"></div>
       <div class="confeti">${Array.from({ length: 36 }, (_, i) => `<i style="left:${(i * 37) % 100}%;animation-delay:${(i % 12) * 0.12}s;background:${["#f5b83d", "#c8102e", "#4ff0dc", "#ffffff", "#7b1fa2"][i % 5]}"></i>`).join("")}</div>
+      <svg class="nivel-inti" viewBox="-60 -60 120 120" aria-hidden="true"><g fill="#f5b83d" stroke="#7a3a12" stroke-width="3"><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(0)"/><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(30)"/><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(60)"/><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(90)"/><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(120)"/><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(150)"/><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(180)"/><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(210)"/><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(240)"/><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(270)"/><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(300)"/><path d="M-7 -30 L0 -52 L7 -30 Z" transform="rotate(330)"/></g><circle r="26" fill="#ffd166" stroke="#7a3a12" stroke-width="4"/><circle r="17" fill="none" stroke="#c8102e" stroke-width="3"/><path d="M-8 -3 h5 M3 -3 h5 M-6 7 q6 5 12 0" stroke="#7a3a12" stroke-width="3" fill="none" stroke-linecap="round"/></svg>
       ${retrato(estado.heroe || "chaski", 120)}
-      <h2 class="nivel-titulo">¡NUEVO NIVEL!</h2>
+      <h2 class="nivel-titulo nivel-banda">¡NUEVO NIVEL!</h2>
       <p class="nivel-numero">Nivel ${estado.nivel}</p>
       <div class="nivel-premios">
         <span>⚡ ${estado.kallpa} kallpa</span>
