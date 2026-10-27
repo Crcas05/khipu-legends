@@ -30,12 +30,18 @@ export interface Estado {
   zonaActual: string;
   /** Zonas cuyo jefe ya fue derrotado. */
   jefes: string[];
+  /** Ayudas de botones ya mostradas. */
+  ayudas: string[];
+  /** Tesoros ocultos (solo visibles con el Ojo) ya encontrados: "zona:i". */
+  tesoros: string[];
+  /** Leer los diálogos en voz alta. */
+  voz: boolean;
 }
 
 const CLAVE = "chaski-runes-v1";
 
 function inicial(): Estado {
-  return { heroe: "", nombre: "", paso: "prologo", kallpa: 0, exp: 0, nivel: 1, palabras: [], codigo: "", logros: [], nudos: [], runas: {}, racha: 0, ultimoDia: "", rescates: [], inventario: {}, zonas: {}, sellos: {}, leccionPaso: {}, zonaActual: "", jefes: [] };
+  return { heroe: "", nombre: "", paso: "prologo", kallpa: 0, exp: 0, nivel: 1, palabras: [], codigo: "", logros: [], nudos: [], runas: {}, racha: 0, ultimoDia: "", rescates: [], inventario: {}, zonas: {}, sellos: {}, leccionPaso: {}, zonaActual: "", jefes: [], ayudas: [], tesoros: [], voz: false };
 }
 
 function cargar(): Estado {

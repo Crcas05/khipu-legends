@@ -25,7 +25,9 @@ import { Chaski, MamaKhipu, crearMarcador } from "./heroes";
 import { entrada, iniciarControles } from "./controles";
 import { estado, guardar, hayPartida, reiniciar, yaPaso, enSelva, enValle, type Paso } from "./estado";
 import { BLOQUES_1, MAMA_TALLER, RETO_TALLER, INTRO, MAMA_1, FUENTE_LISTA, TECHO_LISTO, MAMA_2, FINAL, REPARAR_FUENTE, REPARAR_TECHO, APRENDIDO } from "./datos/episodio1";
-import { hablar, dialogoAbierto } from "./ui/dialogo";
+import { hablar, dialogoAbierto, alHablar } from "./ui/dialogo";
+import { ayudaBoton } from "./ui/ayudas";
+import { hayVoz, decir } from "./ui/hablaCel";
 import { aviso, actualizarHud, ganarKallpa, fijarObjetivo } from "./ui/hud";
 import { abrirReparacion } from "./ui/reparar";
 import { abrirTaller } from "./ui/taller";
@@ -69,6 +71,7 @@ escena.fogStart = 45;
 escena.fogEnd = 95;
 
 let radioBase = 20;
+let betaBase = 0.82;
 const camara = new ArcRotateCamera("camara", -Math.PI / 2, 0.92, 20, Vector3.Zero(), escena);
 camara.minZ = 0.5;
 camara.maxZ = 200;
@@ -77,6 +80,7 @@ function ajustarCamara() {
   camara.fovMode = vertical ? ArcRotateCamera.FOVMODE_HORIZONTAL_FIXED : ArcRotateCamera.FOVMODE_VERTICAL_FIXED;
   camara.fov = vertical ? 1.05 : 0.75;
   camara.beta = vertical ? 0.56 : 0.82;
+  betaBase = camara.beta;
   radioBase = vertical ? 19 : 19;
   camara.radius = radioBase;
   document.body.classList.toggle("vertical", vertical);
@@ -265,6 +269,43 @@ const ETIQUETAS: Etiqueta[] = [
   { clave: "punku", region: "selva", posicion: () => PUERTA.add(new Vector3(0, 6.6, 0)), texto: () => `punku.abierta = ${yaPaso("ecos") ? "True" : "False"}`, editable: () => false },
   { clave: "rumi", region: "selva", posicion: () => new Vector3(0, 2.2, 7), texto: () => `rumi = [${PIEDRAS.map((_, i) => (rumiEncendidas[i] ? "True" : "False")).join(", ")}]`, editable: () => false },
   { clave: "amaru", region: "selva", posicion: () => amaru.raiz.position.add(new Vector3(0, 3.6, 0)), texto: () => `amaru.magia = "río"`, editable: () => false },
+  // Zonas del viaje: el Ojo muestra qué enseña cada altar, los tesoros y el estado del jefe
+  ...[0, 1, 2, 3].map((i) => ({
+    clave: `altar-${i}`,
+    region: "zona" as Region,
+    posicion: () => {
+      const s = zonaJuego.zona?.sitios[i];
+      return s ? new Vector3(s.x, 5.2, s.z) : new Vector3(0, -50, 0);
+    },
+    texto: () => {
+      const z = zonaJuego.zona;
+      const s = z?.sitios[i];
+      if (!z || !s) return "";
+      return (estado.zonas[z.id] ?? []).includes(s.id) ? `altar.restaurado = True` : `aprenderas = "${s.leccion.modulo}"`;
+    },
+    editable: () => false,
+    visible: () => !!zonaJuego.zona?.sitios[i],
+  })),
+  ...[0, 1].map((i) => ({
+    clave: `tesoro-${i}`,
+    region: "zona" as Region,
+    posicion: () => (zonaJuego.datosOjo().tesoros[i] ?? new Vector3(0, -50, 0)).add(new Vector3(0, 2.6, 0)),
+    texto: () => `tesoro = "✨ ¡acércate!"`,
+    editable: () => false,
+    visible: () => zonaJuego.datosOjo().tesoros.length > i,
+    tesoro: true,
+  })),
+  {
+    clave: "jefe-ojo",
+    region: "zona" as Region,
+    posicion: () => (zonaJuego.datosOjo().jefe ?? new Vector3(0, -50, 0)).add(new Vector3(0, 4.5, 0)),
+    texto: () => {
+      const d = zonaJuego.datosOjo();
+      return d.escudo ? `jefe.escudo = True  # punto débil: la 🔮 runa` : `jefe.escudo = False  # ¡dispara ya! vida = ${Math.max(0, d.vidaJefe)}`;
+    },
+    editable: () => false,
+    visible: () => !!zonaJuego.datosOjo().jefe,
+  },
   ...(Object.keys(SITIOS) as Sitio[]).map((s) => ({
     clave: `sitio-${s}`,
     region: "valle" as Region,
@@ -313,6 +354,7 @@ function alternarOjo(forzar?: boolean) {
   }
   ojoAbierto = forzar ?? !ojoAbierto;
   document.body.classList.toggle("ojo", ojoAbierto);
+  if (region === "zona") zonaJuego.verConOjo(ojoAbierto);
   for (const m of escena.materials) {
     if (!(m instanceof StandardMaterial) || m.name === "m-marcador" || m.name === "m-cielo") continue;
     if (ojoAbierto) {
@@ -877,6 +919,57 @@ function actualizarBotones() {
   $("boton-accion").hidden = !yaPaso("hablar1");
   const avisar = ["hablar1", "hablar2", "final"].includes(estado.paso);
   marcador.isVisible = avisar;
+  // Manito 👆 la primera vez que aparece cada botón
+  window.setTimeout(() => {
+    if (!jugando || ocupado || dialogoAbierto()) return;
+    const pistas: [string, string][] = [
+      ["boton-hablar", "¡Toca para hablar!"],
+      ["boton-rescatar", region === "zona" ? "¡Aprende aquí!" : "¡Rescata este lugar!"],
+      ["boton-huaraca", "¡Dispara a los Bugs!"],
+      ["boton-accion", "Mira el mundo como código"],
+      ["boton-taller", "Escribe tus runas"],
+      ["chip-mapa", "Mapa del viaje"],
+    ];
+    for (const [id, texto] of pistas) ayudaBoton(id, $(id), texto);
+  }, 600);
+}
+
+// Si el jugador se queda quieto, Tuki le recuerda qué hacer
+let ultimoInput = performance.now();
+const marcarInput = () => (ultimoInput = performance.now());
+window.addEventListener("pointerdown", marcarInput, { capture: true });
+window.addEventListener("keydown", marcarInput, { capture: true });
+window.setInterval(() => {
+  if (!jugando || ocupado || dialogoAbierto() || batalla.activa) return;
+  if (Math.abs(entrada.x) + Math.abs(entrada.y) > 0.05) return marcarInput();
+  if (performance.now() - ultimoInput < 25000) return;
+  marcarInput();
+  const obj = document.getElementById("objetivo-texto")?.textContent?.trim();
+  if (obj) {
+    aviso(`💡 Tuki: ${obj}`, 4500);
+    if (estado.voz) decir(`Psst. ${obj}`, "tuki");
+  }
+}, 2000);
+
+// Quien habla mira a Chaski y hace un gesto
+alHablar((quien) => {
+  const npc = quien === "amaru" ? amaru : quien === "killa" ? killa : null;
+  if (npc) {
+    girarHacia(npc.raiz, chaski.raiz.position);
+    npc.gesto();
+  } else if (quien === "mama") mama.gesto();
+  else if (quien === "chaski") chaski.gesto();
+});
+function girarHacia(n: TransformNode, p: Vector3) {
+  n.rotation.y = Math.atan2(p.x - n.position.x, p.z - n.position.z);
+}
+/** Giro suave para que los personajes cercanos sigan con la mirada a Chaski. */
+function mirarSuave(n: TransformNode, p: Vector3, dt: number, distancia = 6) {
+  if (!n.isEnabled() || Vector3.Distance(n.position, p) > distancia) return;
+  const meta = Math.atan2(p.x - n.position.x, p.z - n.position.z);
+  let d = meta - n.rotation.y;
+  d = Math.atan2(Math.sin(d), Math.cos(d));
+  n.rotation.y += d * Math.min(1, dt * 4);
 }
 
 iniciarControles();
@@ -918,6 +1011,17 @@ $("boton-sonido").addEventListener("click", () => {
   pintarSonido();
 });
 $("boton-ajustes").addEventListener("click", () => ($("ajustes").hidden = !$("ajustes").hidden));
+const pintarVoz = () => {
+  $("boton-voz").textContent = estado.voz ? "🗣 Voz que lee: sí" : "🗣 Voz que lee: no";
+  $("boton-voz").hidden = !hayVoz();
+};
+pintarVoz();
+$("boton-voz").addEventListener("click", () => {
+  estado.voz = !estado.voz;
+  guardar();
+  pintarVoz();
+  if (estado.voz) decir("¡Allillanchu! Ahora leeré los diálogos en voz alta.", "tuki");
+});
 $("cerrar-ajustes").addEventListener("click", () => ($("ajustes").hidden = true));
 $("boton-reiniciar").addEventListener("click", () => {
   if (confirmarDoble($("boton-reiniciar") as HTMLButtonElement)) {
@@ -1061,10 +1165,27 @@ escena.onBeforeRenderObservable.add(() => {
   chaski.actualizar(dx, dz, dt);
   tuki.seguir(chaski.raiz, dt);
   mama.actualizar(dt);
-  camara.target = Vector3.Lerp(camara.target, pos.add(new Vector3(0, 1.2, 0)), Math.min(1, dt * 6)).add(sacudida.tomar(dt));
-  // Cámara de cine: se acerca durante los diálogos
-  const radioObjetivo = dialogoAbierto() ? radioBase * 0.72 : radioBase;
-  camara.radius += (radioObjetivo - camara.radius) * Math.min(1, dt * 3);
+  if (jugando && region === "plaza") mirarSuave(mama.raiz, chaski.raiz.position, dt, 7);
+  if (jugando && region === "selva" && guiaActual !== "amaru") mirarSuave(amaru.raiz, chaski.raiz.position, dt, 6);
+  if (!jugando) {
+    // Portada: cámara de cine que gira lento alrededor de Chaski
+    camara.alpha += dt * 0.12;
+    // Chaski a un costado para que el logo no lo tape (en vertical, más abajo)
+    const vertical = document.body.classList.contains("vertical");
+    camara.targetScreenOffset.x += ((vertical ? 0 : -3.2) - camara.targetScreenOffset.x) * Math.min(1, dt * 2);
+    camara.targetScreenOffset.y += ((vertical ? 1.6 : 0) - camara.targetScreenOffset.y) * Math.min(1, dt * 2);
+    camara.beta += (1.25 - camara.beta) * Math.min(1, dt * 2);
+    camara.radius += (8.5 - camara.radius) * Math.min(1, dt * 2);
+    camara.target.copyFrom(Vector3.Lerp(camara.target, pos.add(new Vector3(0, 2.1, 0)), Math.min(1, dt * 3)));
+  } else {
+    camara.alpha += (-Math.PI / 2 - camara.alpha) * Math.min(1, dt * 4);
+    camara.targetScreenOffset.scaleInPlace(1 - Math.min(1, dt * 4));
+    camara.beta += (betaBase - camara.beta) * Math.min(1, dt * 4);
+    camara.target.copyFrom(Vector3.Lerp(camara.target, pos.add(new Vector3(0, 1.2, 0)), Math.min(1, dt * 6)).add(sacudida.tomar(dt)));
+    // Cámara de cine: se acerca durante los diálogos
+    const radioObjetivo = dialogoAbierto() ? radioBase * 0.72 : radioBase;
+    camara.radius += (radioObjetivo - camara.radius) * Math.min(1, dt * 3);
+  }
   // Flecha guía
   const destino = destinoGuia();
   const lejos = destino ? Math.hypot(destino.x - pos.x, destino.z - pos.z) : 0;
@@ -1255,7 +1376,38 @@ async function empezar() {
 if (hayPartida()) {
   $("boton-jugar").textContent = "▶ CONTINUAR";
   $("boton-nueva").hidden = false;
+  const modulos = Object.keys(estado.sellos).length;
+  const zona = ZONAS.find((z) => z.id === estado.zonaActual);
+  $("portada-progreso").textContent = `${estado.nombre || "Chaski"} · Nivel ${estado.nivel} · ${zona ? `Zona ${zona.numero}: ${zona.nombre}` : yaPaso("victoria") ? "El viaje por el Perú" : "Pueblo de Qhapaq"} · ${modulos} ${modulos === 1 ? "módulo" : "módulos"}`;
 }
+$("menu-mapa").hidden = !yaPaso("victoria");
+$("menu-mapa").addEventListener("click", async () => {
+  await empezar();
+  enCalma(irAlMapa);
+});
+$("menu-personajes").addEventListener("click", async () => {
+  sonido.toque();
+  $("portada").hidden = true;
+  await elegirHeroe(true);
+  $("portada").hidden = false;
+});
+$("menu-logros").addEventListener("click", async () => {
+  sonido.toque();
+  await abrirSimiQillqa();
+});
+$("menu-ajustes").addEventListener("click", () => {
+  sonido.toque();
+  $("ajustes").hidden = !$("ajustes").hidden;
+});
+// La música de la portada empieza al primer toque (los navegadores no dejan antes)
+window.addEventListener(
+  "pointerdown",
+  () => {
+    despertarAudio();
+    iniciarMusica();
+  },
+  { once: true }
+);
 $("boton-jugar").addEventListener("click", () => empezar());
 $("boton-nueva").addEventListener("click", () => {
   if (!confirmarDoble($("boton-nueva") as HTMLButtonElement)) return;

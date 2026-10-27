@@ -108,6 +108,11 @@ export class Chaski {
     this.modelo?.accion("Spellcast_Shoot", 0.9);
   }
 
+  /** Gesto al hablar (mueve las manos). */
+  gesto() {
+    this.modelo?.accion("Interact", 1.1);
+  }
+
   /** Reacciona a un golpe. */
   golpeado() {
     this.modelo?.accion("Hit_A", 0.6);
@@ -430,10 +435,18 @@ export class MamaKhipu {
     });
   }
 
+  private gestoT = 0;
+  /** Al hablar levanta el khipu y asiente. */
+  gesto() {
+    this.gestoT = 1.2;
+  }
+
   actualizar(dt: number) {
     this.tiempo += dt;
-    this.cuerdas.rotation.x = Math.sin(this.tiempo * 1.6) * 0.08;
-    this.raiz.position.y = Math.sin(this.tiempo * 1.2) * 0.015;
+    this.gestoT = Math.max(0, this.gestoT - dt);
+    const g = this.gestoT > 0 ? Math.sin(this.gestoT * 9) : 0;
+    this.cuerdas.rotation.x = Math.sin(this.tiempo * 1.6) * 0.08 + g * 0.35;
+    this.raiz.position.y = Math.sin(this.tiempo * 1.2) * 0.015 + Math.abs(g) * 0.06;
   }
 
   get posicion(): Vector3 {

@@ -59,7 +59,8 @@ const HEROES: Heroe[] = [
   },
 ];
 
-export function elegirHeroe(): Promise<string> {
+/** Selección de héroe. soloVer: galería desde la portada (con botón Volver). */
+export function elegirHeroe(soloVer = false): Promise<string> {
   const caja = document.getElementById("seleccion")!;
   let elegido = HEROES[0];
   const pintar = () => {
@@ -83,8 +84,9 @@ export function elegirHeroe(): Promise<string> {
             ${
               elegido.desbloqueo
                 ? `<p class="bloqueo">🔒 ${elegido.desbloqueo}</p>`
-                : `<button class="boton-oro" id="confirmar-heroe">CONFIRMAR</button>`
+                : `<button class="boton-oro" id="confirmar-heroe">${soloVer ? "◂ VOLVER" : "CONFIRMAR"}</button>`
             }
+            ${soloVer && elegido.desbloqueo ? `<button class="boton-secundario" id="confirmar-heroe">◂ VOLVER</button>` : ""}
           </div>
         </div>
       </div>`;

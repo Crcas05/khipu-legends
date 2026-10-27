@@ -96,6 +96,9 @@ export class ZonaJuego {
   private proximoAtaque = 4;
   private proximaOla = 12;
   private enPregunta = false;
+  // Tesoros ocultos: solo se ven (y se recogen) con el Ojo abierto
+  private tesoros: { malla: TransformNode; i: number }[] = [];
+  ojoAbierto = false;
 
   constructor(private c: Contexto) {
     for (const [tipo, d] of Object.entries(TIPOS) as [TipoBug, (typeof TIPOS)[TipoBug]][]) {
@@ -141,12 +144,15 @@ export class ZonaJuego {
     document.getElementById("hud-valle")!.hidden = false;
     document.getElementById("amenaza")!.hidden = this.todoRestaurado();
     document.body.classList.add("en-valle");
+    this.ponerTesoros();
     cambiarMusica(MUSICA_ZONA[z.id] ?? "andes");
     this.pintarHud();
     if (this.todoRestaurado() && !estado.jefes.includes(z.id)) window.setTimeout(() => this.iniciarJefe(), 1500);
   }
 
   salir() {
+    for (const t of this.tesoros) t.malla.dispose();
+    this.tesoros = [];
     for (const b of this.bugs) b.raiz.dispose();
     this.bugs = [];
     this.terminarJefe(false);
@@ -155,6 +161,46 @@ export class ZonaJuego {
     this.zona = null;
     document.getElementById("amenaza")!.hidden = true;
     document.body.classList.remove("amenaza");
+  }
+
+  /** Dos tesoros escondidos por zona, en lugares fijos. */
+  private ponerTesoros() {
+    if (!this.zona) return;
+    const lugares = [
+      [-24 + this.zona.numero, 22 - this.zona.numero],
+      [22 - this.zona.numero * 0.5, -18 + this.zona.numero],
+    ];
+    const mat = new StandardMaterial("m-tesoro", this.c.escena);
+    mat.emissiveColor = new Color3(1, 0.82, 0.3);
+    mat.disableLighting = true;
+    lugares.forEach(([x, z], i) => {
+      if (estado.tesoros.includes(`${this.zona!.id}:${i}`)) return;
+      const r = new TransformNode("tesoro", this.c.escena);
+      const nudo = MeshBuilder.CreateTorusKnot("tesoro", { radius: 0.45, tube: 0.14, radialSegments: 48 }, this.c.escena);
+      nudo.material = mat;
+      nudo.parent = r;
+      nudo.position.y = 1.2;
+      r.position.set(x, 0, z);
+      r.setEnabled(this.ojoAbierto);
+      this.tesoros.push({ malla: r, i });
+    });
+  }
+
+  /** El Ojo se abrió o cerró: los tesoros aparecen o desaparecen. */
+  verConOjo(abierto: boolean) {
+    this.ojoAbierto = abierto;
+    for (const t of this.tesoros) t.malla.setEnabled(abierto);
+    if (abierto && this.tesoros.length) this.c.aviso(`👁 ¡El Ojo revela ${this.tesoros.length} tesoro${this.tesoros.length > 1 ? "s" : ""} escondido${this.tesoros.length > 1 ? "s" : ""}! Búscalo${this.tesoros.length > 1 ? "s" : ""} en el minimapa (✨).`, 3500);
+  }
+
+  /** Posiciones para las etiquetas del Ojo. */
+  datosOjo() {
+    return {
+      tesoros: this.tesoros.map((t) => t.malla.position),
+      jefe: this.jefe ? this.jefe.raiz.position : null,
+      escudo: this.escudoArriba,
+      vidaJefe: this.jefe?.vida ?? 0,
+    };
   }
 
   private todoRestaurado() {
@@ -331,6 +377,22 @@ export class ZonaJuego {
       }
       if (this.jefe) this.actualizarJefe(dt);
     } else if (this.jefe) this.jefe.actualizar(dt, p);
+    // Recoger tesoros con el Ojo abierto
+    for (const t of [...this.tesoros]) {
+      t.malla.rotation.y += dt * 2;
+      if (!this.ojoAbierto || Math.hypot(p.x - t.malla.position.x, p.z - t.malla.position.z) > 2) continue;
+      estado.tesoros.push(`${this.zona.id}:${t.i}`);
+      estado.inventario.piedra = (estado.inventario.piedra ?? 0) + 2;
+      guardar();
+      estallido(this.c.escena, t.malla.position.add(new Vector3(0, 1.2, 0)), ["#ffd166", "#4ff0dc", "#ffffff"], 70, 5);
+      sonido.tesoro();
+      t.malla.dispose();
+      this.tesoros.splice(this.tesoros.indexOf(t), 1);
+      this.c.ganarKallpa(5);
+      this.c.aviso(`✨ ¡Tesoro oculto! +5 kallpa y +2 piedra. Quedan ${this.tesoros.length} en esta zona.`, 3000);
+      this.c.desbloquear("tesoro");
+      this.pintarHud();
+    }
     this.mapaCada -= dt;
     if (this.mapaCada <= 0) {
       this.mapaCada = 0.2;
@@ -668,6 +730,12 @@ export class ZonaJuego {
     if (this.jefe) {
       const [x, y] = aMapa(this.jefe.raiz.position.x, this.jefe.raiz.position.z);
       ctx.fillText("🐛", x, y);
+    }
+    if (this.ojoAbierto) {
+      for (const t of this.tesoros) {
+        const [x, y] = aMapa(t.malla.position.x, t.malla.position.z);
+        ctx.fillText("✨", x, y);
+      }
     }
     if (this.runa && this.escudoArriba) {
       const [x, y] = aMapa(this.runa.position.x, this.runa.position.z);

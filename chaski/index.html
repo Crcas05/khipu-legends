@@ -20,11 +20,15 @@
       <span class="logo-2">RUNES</span>
       <span class="logo-sub">Aprende Python y SQL mientras juegas</span>
     </div>
-    <div class="fila-botones">
-      <button id="boton-jugar" class="boton-oro">▶ JUGAR</button>
-      <button id="boton-nueva" class="boton-secundario" hidden>Nueva partida</button>
-    </div>
-    <p class="nota">Temporada 1 · Misión 1 · Episodio 1</p>
+    <button id="boton-jugar" class="boton-oro boton-jugar-grande">▶ JUGAR</button>
+    <nav class="menu-portada">
+      <button id="menu-mapa" hidden>🗺<span>MAPA</span></button>
+      <button id="menu-personajes">🦸<span>PERSONAJES</span></button>
+      <button id="menu-logros">🏆<span>LOGROS</span></button>
+      <button id="menu-ajustes">⚙<span>AJUSTES</span></button>
+    </nav>
+    <p class="nota" id="portada-progreso">Una aventura por el Perú · Python y SQL</p>
+    <button id="boton-nueva" class="enlace-nueva" hidden>Empezar una partida nueva</button>
   </section>
 
   <section id="seleccion" class="desplazable" hidden></section>
@@ -67,6 +71,7 @@
       <button data-calidad="alto">Alto</button>
     </div>
     <button class="boton-secundario" id="boton-sonido">🔊 Sonido: sí</button>
+    <button class="boton-secundario" id="boton-voz">🗣 Voz que lee: no</button>
     <button class="boton-secundario" id="boton-pantalla">⛶ Pantalla completa</button>
     <button class="boton-secundario peligro" id="boton-reiniciar">↺ Empezar de nuevo</button>
     <button class="boton-oro" id="cerrar-ajustes">Volver al juego</button>
@@ -82,6 +87,7 @@
       <p id="dialogo-texto"></p>
       <span class="dialogo-seguir">toca para seguir ▸</span>
     </div>
+    <button id="dialogo-voz" aria-label="Escuchar" title="Escuchar">🔊</button>
   </div>
 
   <div id="zona-joystick"></div>

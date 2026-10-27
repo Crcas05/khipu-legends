@@ -5,6 +5,11 @@ import { estado, guardar } from "../estado";
 import { retrato } from "./retratos";
 import { aviso, actualizarHud } from "./hud";
 import { sonido, musicaSuave } from "../sonido";
+import { decir, callar, hayVoz } from "./hablaCel";
+
+let alHablarFn: ((quien: string) => void) | null = null;
+/** El juego se entera de quién habla (para que ese personaje gire y haga gestos). */
+export const alHablar = (fn: (quien: string) => void) => (alHablarFn = fn);
 
 let abierto = false;
 export const dialogoAbierto = () => abierto;
@@ -69,6 +74,8 @@ export function hablar(lineas: Linea[]): Promise<void> {
           texto.innerHTML = htmlCompleto;
         }
       }, 20);
+      alHablarFn?.(l.quien);
+      if (estado.voz) decir(l.texto, l.quien);
       if (nuevas.length) aviso(`📖 Nueva palabra quechua: ${nuevas.map((p) => `${p} = ${PALABRAS[p]}`).join(" · ")}`, 4500);
     };
 
@@ -83,6 +90,7 @@ export function hablar(lineas: Linea[]): Promise<void> {
       i++;
       if (i < lineas.length) return mostrar();
       caja.hidden = true;
+      callar();
       abierto = false;
       document.body.classList.remove("hablando");
       musicaSuave(false);
@@ -92,6 +100,10 @@ export function hablar(lineas: Linea[]): Promise<void> {
     };
     const alTocar = (e: Event) => {
       e.preventDefault();
+      if ((e.target as HTMLElement).closest("#dialogo-voz")) {
+        decir(lineas[i].texto, lineas[i].quien);
+        return;
+      }
       avanzar();
     };
     const alTeclear = (e: KeyboardEvent) => {
@@ -100,6 +112,7 @@ export function hablar(lineas: Linea[]): Promise<void> {
         avanzar();
       }
     };
+    document.getElementById("dialogo-voz")!.hidden = !hayVoz();
     caja.addEventListener("pointerdown", alTocar);
     window.addEventListener("keydown", alTeclear);
     mostrar();
