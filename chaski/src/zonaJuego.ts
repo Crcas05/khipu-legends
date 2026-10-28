@@ -2,6 +2,7 @@
 // suspenso (el Bug avanza con una cuenta regresiva), rescate (lecciones en los altares)
 // y un jefe final por zona cuyo escudo solo cae respondiendo runas de esa zona.
 
+import { armarBicho, formaDe } from "./bichos";
 import { esquivoElGolpe } from "./movimiento";
 import { Scene } from "@babylonjs/core/scene";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
@@ -221,20 +222,14 @@ export class ZonaJuego {
   private ponerBug(sitio: string, tipo: TipoBug, donde: Vector3) {
     const d = TIPOS[tipo];
     const raiz = new TransformNode("minibug", this.c.escena);
-    const cuerpo = tipo === "divisor" ? MeshBuilder.CreatePolyhedron("glitch", { type: 2, size: d.tam * 0.6 }, this.c.escena) : MeshBuilder.CreateBox("glitch", { size: d.tam }, this.c.escena);
-    cuerpo.material = this.mats.get(tipo)!;
-    cuerpo.parent = raiz;
+    // Bicho corrompido según la región de la zona (cangrejo, araña o escarabajo)
+    const z = this.zona;
+    armarBicho(this.c.escena, raiz, formaDe(z ? `${z.region} ${z.ambiente}` : undefined), this.mats.get(tipo)!, this.ojoMat, d.tam / 0.8);
     if (tipo === "escudo") {
       const anillo = MeshBuilder.CreateTorus("glitch", { diameter: d.tam * 1.7, thickness: 0.1, tessellation: 20 }, this.c.escena);
       anillo.material = this.ojoMat;
       anillo.parent = raiz;
       anillo.rotation.x = Math.PI / 2;
-    }
-    for (const lado of [-1, 1]) {
-      const ojo = MeshBuilder.CreateSphere("glitch", { diameter: d.tam * 0.27, segments: 6 }, this.c.escena);
-      ojo.material = this.ojoMat;
-      ojo.parent = raiz;
-      ojo.position.set(d.tam * 0.22 * lado, d.tam * 0.15, d.tam * 0.52);
     }
     raiz.position.copyFrom(donde);
     this.bugs.push({ raiz, tipo, vida: d.vida, casa: donde.clone(), sitio, golpeHasta: 0, t: Math.random() * 5 });
@@ -365,7 +360,7 @@ export class ZonaJuego {
       const vel = TIPOS[b.tipo].velocidad;
       if (!quieto && !((b.quietoHasta ?? 0) > this.tiempo) && d < (b.sitio === "ola" ? 40 : 9) && d > 1.1) r.position.addInPlace(p.subtract(r.position).normalize().scale(vel * dt));
       else if (d >= 9 && b.sitio !== "ola") r.position = Vector3.Lerp(r.position, b.casa.add(new Vector3(Math.sin(b.t) * 1.2, 0, Math.cos(b.t) * 1.2)), Math.min(1, dt * 1.5));
-      r.position.y = 0.7 + Math.abs(Math.sin(b.t * (b.tipo === "rapido" ? 10 : 6))) * 0.35;
+      r.position.y = Math.abs(Math.sin(b.t * (b.tipo === "rapido" ? 10 : 6))) * 0.08;
       r.rotation.y = Math.atan2(p.x - r.position.x, p.z - r.position.z);
       r.scaling.setAll(this.tiempo < b.golpeHasta ? 1.3 : 1);
       if (!quieto && d < 1.4 && Math.floor(b.t / 0.9) !== Math.floor((b.t - dt) / 0.9)) this.dano(b.tipo === "escudo" ? 10 : 7);

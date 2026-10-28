@@ -1,5 +1,6 @@
-// Sistema de sonido sintetizado en el momento (Web Audio): no descarga archivos.
-// Usa la escala pentatónica andina (la de la quena y el siku) para que todo suene a los Andes.
+// Sistema de sonido (Web Audio). La MELODÍA es una quena REAL: grabaciones de Ximena Núñez del
+// Berklee Intersectional Soundbox Archive (licencia CC BY, ver Créditos). La percusión, el bordón
+// y los efectos se sintetizan en el momento. Todo en la pentatónica de Mi (la de las grabaciones).
 
 let ctx: AudioContext | null = null;
 let maestro: GainNode | null = null;
@@ -16,11 +17,108 @@ let sinMusica = (() => {
 const VOL_MUSICA = 0.36;
 /** Hasta cuándo suena el tema (melodía, ritmo y bordón). Después queda solo el ambiente. */
 let temaHasta = 0;
-const TEMA_SEGUNDOS: Partial<Record<string, number>> = { andes: 55, altiplano: 55, selva: 55, costa: 55, feria: 60, cumbre: 55 };
+const TEMA_SEGUNDOS: Partial<Record<string, number>> = { andes: 110, altiplano: 110, selva: 110, costa: 100, feria: 90, cumbre: 110 };
 let musicaActiva = false;
 
-// Pentatónica menor en La (la escala del huayno): La, Do, Re, Mi, Sol
-const ESCALA = [220, 261.63, 293.66, 329.63, 392, 440, 523.25, 587.33, 659.25, 783.99, 880];
+// Pentatónica menor en Mi (la escala del huayno y de las grabaciones de quena): Mi, Sol, La, Si, Re
+const ESCALA = [220, 246.94, 293.66, 329.63, 392, 440, 493.88, 587.33, 659.25, 783.99, 880];
+
+// ---------------------------------------------------------------------------
+// Quena real: dos grabaciones divididas en frases (segundos de inicio y fin)
+// ---------------------------------------------------------------------------
+const FRASES: Record<"quena1" | "quena2", [number, number][]> = {
+  quena1: [[0, 12.7], [13.2, 16.55], [17.1, 20.2], [20.7, 28.3], [29.05, 37.5], [37.95, 42.1], [42.5, 50.9], [51.35, 54.7]],
+  quena2: [[0, 7.1], [7.7, 11.0], [11.4, 14.55], [15.65, 30.1], [30.75, 34.9], [35.4, 39.6]],
+};
+const buffers: Partial<Record<keyof typeof FRASES, AudioBuffer>> = {};
+let cargandoQuena = false;
+let reverb: ConvolverNode | null = null;
+
+/** Descarga y decodifica la quena (una sola vez, después del primer toque). */
+function cargarQuena() {
+  const c = ctx;
+  if (!c || cargandoQuena) return;
+  cargandoQuena = true;
+  const base = import.meta.env.BASE_URL ?? "./";
+  for (const n of Object.keys(FRASES) as (keyof typeof FRASES)[]) {
+    fetch(`${base}audio/${n}.mp3`)
+      .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+      .then((ab) => new Promise<AudioBuffer>((ok, mal) => c.decodeAudioData(ab, ok, mal)))
+      .then((b) => (buffers[n] = b))
+      .catch(() => {
+        /* sin red: queda la quena sintetizada */
+      });
+  }
+}
+
+/** Sala con eco (cerros, templo, bosque): respuesta al impulso generada. */
+function salaEco(c: AudioContext): ConvolverNode {
+  if (reverb) return reverb;
+  const seg = 2.6;
+  const largo = Math.floor(c.sampleRate * seg);
+  const ir = c.createBuffer(2, largo, c.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = ir.getChannelData(ch);
+    for (let i = 0; i < largo; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / largo, 3.2);
+  }
+  reverb = c.createConvolver();
+  reverb.buffer = ir;
+  const g = c.createGain();
+  g.gain.value = 0.55;
+  reverb.connect(g).connect(musica!);
+  return reverb;
+}
+
+/** Toca una frase real de quena. Devuelve cuánto dura (s) o 0 si aún no está cargada. */
+function fraseQuena(opc: { velocidad?: number; volumen?: number; filtro?: number; eco?: number; en?: number; corta?: boolean; destino?: AudioNode } = {}): number {
+  const c = ctx;
+  if (!c || !musica) return 0;
+  const listas = (Object.keys(FRASES) as (keyof typeof FRASES)[]).filter((n) => buffers[n]);
+  if (!listas.length) return 0;
+  const n = listas[Math.floor(Math.random() * listas.length)];
+  const opciones = opc.corta ? FRASES[n].filter(([x, y]) => y - x < 4.6) : FRASES[n];
+  const [a, b] = opciones[Math.floor(Math.random() * opciones.length)];
+  const vel = opc.velocidad ?? 1;
+  const dur = (b - a) / vel;
+  const t = c.currentTime + (opc.en ?? 0);
+  const src = c.createBufferSource();
+  src.buffer = buffers[n]!;
+  src.playbackRate.value = vel;
+  const g = c.createGain();
+  const vol = opc.volumen ?? 0.9;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(vol, t + 0.08);
+  g.gain.setValueAtTime(vol, t + Math.max(0.1, dur - 0.35));
+  g.gain.linearRampToValueAtTime(0, t + dur);
+  let nodo: AudioNode = src;
+  if (opc.filtro) {
+    const f = c.createBiquadFilter();
+    f.type = "lowpass";
+    f.frequency.value = opc.filtro;
+    nodo = nodo.connect(f);
+  }
+  nodo.connect(g);
+  g.connect(opc.destino ?? musica);
+  if (opc.eco) {
+    const e = c.createGain();
+    e.gain.value = opc.eco;
+    g.connect(e).connect(salaEco(c));
+  }
+  src.start(t, a, b - a);
+  return dur;
+}
+
+/** Cómo suena la quena en cada estilo (velocidad, brillo, eco). */
+const QUENA_ESTILO: Partial<Record<string, { velocidad: number; volumen: number; filtro?: number; eco: number }>> = {
+  andes: { velocidad: 1, volumen: 0.9, eco: 0.35 },
+  cumbre: { velocidad: 1, volumen: 0.85, eco: 0.6 },
+  altiplano: { velocidad: 1, volumen: 0.85, eco: 0.45 },
+  selva: { velocidad: 0.94, volumen: 0.75, filtro: 2600, eco: 0.55 },
+  misterio: { velocidad: 0.84, volumen: 0.6, filtro: 2000, eco: 0.9 },
+  batalla: { velocidad: 1.06, volumen: 1, eco: 0.25 },
+  feria: { velocidad: 1.03, volumen: 0.8, eco: 0.2 },
+  costa: { velocidad: 1, volumen: 0.55, filtro: 3200, eco: 0.3 },
+};
 
 try {
   silenciado = localStorage.getItem("chaski-silencio") === "1";
@@ -40,6 +138,7 @@ function iniciar(): AudioContext | null {
   musica = ctx.createGain();
   musica.gain.value = sinMusica ? 0 : VOL_MUSICA;
   musica.connect(maestro);
+  window.setTimeout(cargarQuena, 300);
   return ctx;
 }
 
@@ -182,28 +281,49 @@ export const sonido = {
   },
   /** El pututu (caracola andina): anuncia algo importante. */
   pututu() {
+    // Avisa al juego: alguien está soplando el pututo (Chaski lo lleva a la boca)
+    window.dispatchEvent(new CustomEvent("pututu"));
     const c = iniciar();
     if (!c || !maestro) return;
     const t = c.currentTime;
-    const osc = c.createOscillator();
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(147, t);
-    osc.frequency.linearRampToValueAtTime(165, t + 0.25);
-    osc.frequency.setValueAtTime(165, t + 1.1);
-    const f = c.createBiquadFilter();
-    f.type = "lowpass";
-    f.frequency.value = 700;
+    // Caracola marina: tono grave que sube, con vibrato del soplo y el "aire" de la concha
     const g = c.createGain();
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.18, t + 0.15);
-    g.gain.setValueAtTime(0.16, t + 1.0);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.5);
-    osc.connect(f).connect(g).connect(maestro);
-    osc.start(t);
-    osc.stop(t + 1.6);
+    g.gain.linearRampToValueAtTime(0.2, t + 0.18);
+    g.gain.setValueAtTime(0.18, t + 1.3);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.9);
+    const formante = c.createBiquadFilter();
+    formante.type = "bandpass";
+    formante.frequency.value = 520;
+    formante.Q.value = 1.4;
+    const vib = c.createOscillator();
+    vib.frequency.value = 5.5;
+    const vg = c.createGain();
+    vg.gain.value = 2.2;
+    vib.connect(vg);
+    for (const [tipo, mult, vol] of [["sawtooth", 1, 0.9], ["square", 2, 0.25], ["sine", 0.5, 0.6]] as [OscillatorType, number, number][]) {
+      const o = c.createOscillator();
+      o.type = tipo;
+      o.frequency.setValueAtTime(131 * mult, t);
+      o.frequency.linearRampToValueAtTime(147 * mult, t + 0.3);
+      o.frequency.setValueAtTime(147 * mult, t + 1.4);
+      o.frequency.linearRampToValueAtTime(139 * mult, t + 1.85);
+      vg.connect(o.frequency);
+      const og = c.createGain();
+      og.gain.value = vol;
+      o.connect(og).connect(formante);
+      o.start(t);
+      o.stop(t + 2);
+    }
+    vib.start(t);
+    vib.stop(t + 2);
+    formante.connect(g).connect(maestro);
+    ruido(0, 1.6, 0.04, 1400);
   },
   nivel() {
     sonido.pututu();
+    // Festejo con una frase corta de quena real (si ya cargó)
+    if (fraseQuena({ corta: true, en: 1.2, volumen: 0.8, eco: 0.4, destino: maestro ?? undefined }) > 0) return;
     const frase = [5, 6, 7, 9, 7, 9, 10];
     frase.forEach((n, i) => quena(ESCALA[n], 0.9 + i * 0.16, i === frase.length - 1 ? 0.9 : 0.22, 0.22));
   },
@@ -222,20 +342,24 @@ interface Receta {
   bordon: number | null; // frecuencia del bordón (null = sin bordón)
   melodia: "quena" | "zampona" | "flauta" | null;
   registro: number; // desplazamiento en la escala
-  ritmo: ("bombo" | "cajon" | "maraca" | "charango" | "tambor" | "-")[][]; // por compás: 8 corcheas
+  ritmo: ("bombo" | "cajon" | "maraca" | "charango" | "tambor" | "manguare" | "quijada" | "-")[][]; // por compás: 8 corcheas
   ambiente: ("viento" | "aves" | "agua" | "olas" | "insectos" | "ranas")[];
   pausa: [number, number]; // silencio entre frases (s)
 }
 
 const RECETAS: Record<Estilo, Receta> = {
-  andes: { bpm: 84, bordon: 110, melodia: "quena", registro: 0, ritmo: [["charango", "-", "-", "charango", "-", "charango", "-", "-"]], ambiente: ["viento"], pausa: [1.5, 3] },
-  altiplano: { bpm: 96, bordon: 98, melodia: "zampona", registro: -1, ritmo: [["bombo", "-", "charango", "charango", "bombo", "-", "charango", "-"]], ambiente: ["viento", "agua"], pausa: [1, 2.5] },
-  selva: { bpm: 100, bordon: null, melodia: "flauta", registro: 1, ritmo: [["tambor", "-", "maraca", "-", "tambor", "tambor", "maraca", "-"]], ambiente: ["aves", "agua", "insectos", "ranas"], pausa: [2, 4] },
-  misterio: { bpm: 66, bordon: 61.7, melodia: "flauta", registro: -1, ritmo: [["tambor", "-", "-", "-", "-", "-", "maraca", "-"], ["-", "-", "-", "-", "tambor", "-", "-", "-"]], ambiente: ["insectos", "ranas", "agua"], pausa: [3, 6] },
-  costa: { bpm: 88, bordon: 82, melodia: "quena", registro: -1, ritmo: [["cajon", "-", "-", "maraca", "cajon", "-", "maraca", "-"]], ambiente: ["olas", "viento"], pausa: [2, 4] },
-  feria: { bpm: 112, bordon: 110, melodia: "quena", registro: 1, ritmo: [["cajon", "-", "maraca", "cajon", "-", "cajon", "maraca", "-"], ["cajon", "-", "maraca", "-", "cajon", "cajon", "maraca", "cajon"]], ambiente: [], pausa: [0.8, 2] },
-  cumbre: { bpm: 72, bordon: 73.4, melodia: "quena", registro: 2, ritmo: [["bombo", "-", "-", "-", "charango", "-", "-", "-"]], ambiente: ["viento", "aves"], pausa: [2, 3.5] },
-  batalla: { bpm: 138, bordon: 55, melodia: "quena", registro: 3, ritmo: [["bombo", "-", "tambor", "bombo", "bombo", "-", "tambor", "tambor"]], ambiente: [], pausa: [0.3, 0.8] },
+  // SIERRA: quena real + charango y bombo de huayno, bordón en Mi
+  andes: { bpm: 84, bordon: 82.41, melodia: "quena", registro: 0, ritmo: [["bombo", "-", "charango", "charango", "-", "charango", "-", "-"]], ambiente: ["viento"], pausa: [2, 4] },
+  altiplano: { bpm: 96, bordon: 82.41, melodia: "zampona", registro: -1, ritmo: [["bombo", "-", "charango", "charango", "bombo", "-", "charango", "-"]], ambiente: ["viento", "agua"], pausa: [1.5, 3] },
+  cumbre: { bpm: 72, bordon: 82.41, melodia: "quena", registro: 2, ritmo: [["bombo", "-", "-", "-", "charango", "-", "-", "-"]], ambiente: ["viento", "aves"], pausa: [2.5, 4.5] },
+  // SELVA: manguaré (tambor de tronco), maracas y el bosque; quena con sonido de caña
+  selva: { bpm: 100, bordon: null, melodia: "flauta", registro: 1, ritmo: [["manguare", "-", "maraca", "-", "manguare", "manguare", "maraca", "-"]], ambiente: ["aves", "agua", "insectos", "ranas"], pausa: [3, 6] },
+  misterio: { bpm: 66, bordon: 41.2, melodia: "flauta", registro: -1, ritmo: [["manguare", "-", "-", "-", "-", "-", "maraca", "-"], ["-", "-", "-", "-", "manguare", "-", "-", "-"]], ambiente: ["insectos", "ranas", "agua"], pausa: [4, 7] },
+  // COSTA: cajón y quijada (ritmo de festejo), olas del Pacífico
+  costa: { bpm: 112, bordon: 82.41, melodia: "quena", registro: -1, ritmo: [["cajon", "-", "quijada", "cajon", "-", "cajon", "maraca", "-"], ["cajon", "-", "maraca", "-", "cajon", "cajon", "quijada", "-"]], ambiente: ["olas", "viento"], pausa: [3, 6] },
+  feria: { bpm: 112, bordon: 82.41, melodia: "quena", registro: 1, ritmo: [["cajon", "-", "maraca", "cajon", "-", "cajon", "maraca", "-"], ["cajon", "-", "maraca", "-", "cajon", "cajon", "maraca", "cajon"]], ambiente: [], pausa: [1, 2.5] },
+  // PELEA: bombo y tambor rápidos + quena real
+  batalla: { bpm: 138, bordon: 41.2, melodia: "quena", registro: 3, ritmo: [["bombo", "-", "tambor", "bombo", "bombo", "-", "tambor", "tambor"]], ambiente: [], pausa: [0.4, 1] },
 };
 
 function ruidoBuffer(c: AudioContext, segundos: number) {
@@ -271,6 +395,36 @@ function percusion(tipo: string, t: number, notaBase: number) {
     n.connect(f).connect(g);
     n.start(t);
     if (tipo === "cajon") percusion("tambor", t, notaBase);
+  } else if (tipo === "manguare") {
+    // Manguaré: tambor de tronco hueco de la Amazonía (dos tonos de madera)
+    for (const [fr, v] of [[notaBase % 2 ? 196 : 147, 0.45], [notaBase % 2 ? 392 : 294, 0.12]] as [number, number][]) {
+      const o = c.createOscillator();
+      o.frequency.setValueAtTime(fr * 1.04, t);
+      o.frequency.exponentialRampToValueAtTime(fr, t + 0.05);
+      const gg = c.createGain();
+      gg.gain.setValueAtTime(v, t);
+      gg.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+      o.connect(gg).connect(g);
+      o.start(t);
+      o.stop(t + 0.5);
+    }
+    g.gain.value = 1;
+  } else if (tipo === "quijada") {
+    // Quijada de burro (costa afroperuana): traqueteo de dientes
+    for (let i = 0; i < 7; i++) {
+      const n = c.createBufferSource();
+      n.buffer = ruidoBuffer(c, 0.03);
+      const f = c.createBiquadFilter();
+      f.type = "bandpass";
+      f.frequency.value = 3200;
+      const gg = c.createGain();
+      const ti = t + i * 0.022;
+      gg.gain.setValueAtTime(0.18 * (1 - i / 8), ti);
+      gg.gain.exponentialRampToValueAtTime(0.0001, ti + 0.03);
+      n.connect(f).connect(gg).connect(g);
+      n.start(ti);
+    }
+    g.gain.value = 1;
   } else if (tipo === "charango") {
     // Rasgueo: 3 cuerdas pulsadas casi a la vez
     g.gain.value = 0.16;
@@ -480,6 +634,17 @@ export function iniciarMusica(nuevo?: Estilo) {
   let paso = 4 + r.registro;
   const tocarFrase = () => {
     if (gen !== generacion) return;
+    // Quena REAL si ya cargó (la zampoña del altiplano sigue sintetizada)
+    const q = QUENA_ESTILO[estilo];
+    if (q && r.melodia !== "zampona" && conTema()) {
+      const d = fraseQuena(q);
+      if (d > 0) {
+        if (r.ambiente.includes("aves") && Math.random() < 0.6) window.setTimeout(cantarAve, Math.random() * 2000);
+        if (r.ambiente.includes("ranas") && Math.random() < 0.7) window.setTimeout(croar, Math.random() * 2500);
+        window.setTimeout(tocarFrase, (d + r.pausa[0] + Math.random() * (r.pausa[1] - r.pausa[0])) * 1000);
+        return;
+      }
+    }
     let t = 0;
     const motivos = MOTIVOS[estilo];
     const motivo = motivos && Math.random() < 0.55 ? motivos[Math.floor(Math.random() * motivos.length)] : null;
@@ -583,10 +748,32 @@ export function lluviaSonido(intensidad: number, granizo = false) {
 }
 
 /** Rugido grave (felino) o graznido para los animales corrompidos. */
-export function rugido(tipo: "felino" | "ave" | "serpiente" | "murcielago" | "zorro" = "felino") {
+export function rugido(tipo: "felino" | "ave" | "serpiente" | "murcielago" | "zorro" | "jarjacha" = "felino") {
   const c = iniciar();
   if (!c || !maestro) return;
   const t = c.currentTime;
+  if (tipo === "jarjacha") {
+    // "¡Qar… qar… qar!": tres gritos ásperos y nasales en la neblina
+    for (let i = 0; i < 3; i++) {
+      const ti = t + i * 0.38;
+      const o = c.createOscillator();
+      o.type = "sawtooth";
+      o.frequency.setValueAtTime(260, ti);
+      o.frequency.exponentialRampToValueAtTime(170, ti + 0.25);
+      const bp = c.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = 950;
+      bp.Q.value = 3;
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, ti);
+      g.gain.exponentialRampToValueAtTime(0.22, ti + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, ti + 0.28);
+      o.connect(bp).connect(g).connect(maestro);
+      o.start(ti);
+      o.stop(ti + 0.3);
+    }
+    return;
+  }
   const o = c.createOscillator();
   const g = c.createGain();
   const f = c.createBiquadFilter();

@@ -11,9 +11,10 @@ import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { Color3 } from "@babylonjs/core/Maths/math.color";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { estallido } from "./efectos";
+import { crearModelo, type Modelo } from "./modelos";
 import { sonido, rugido } from "./sonido";
 
-export type Especie = "puma" | "zorro" | "condor" | "otorongo" | "anaconda" | "murcielago";
+export type Especie = "puma" | "zorro" | "condor" | "otorongo" | "anaconda" | "murcielago" | "jarjacha";
 
 export const NOMBRE_ESPECIE: Record<Especie, string> = {
   puma: "puma",
@@ -22,9 +23,12 @@ export const NOMBRE_ESPECIE: Record<Especie, string> = {
   otorongo: "otorongo",
   anaconda: "anaconda",
   murcielago: "murciélago",
+  jarjacha: "Jarjacha",
 };
 
-const DATOS: Record<Especie, { vida: number; vel: number; vuela: boolean; dano: number; sonido: "felino" | "ave" | "serpiente" | "murcielago" | "zorro" }> = {
+const DATOS: Record<Especie, { vida: number; vel: number; vuela: boolean; dano: number; sonido: "felino" | "ave" | "serpiente" | "murcielago" | "zorro" | "jarjacha" }> = {
+  // Ser de leyenda (no es un animal): se espanta y huye a la neblina
+  jarjacha: { vida: 8, vel: 3.3, vuela: false, dano: 15, sonido: "jarjacha" },
   puma: { vida: 4, vel: 3.6, vuela: false, dano: 12, sonido: "felino" },
   zorro: { vida: 2, vel: 4.2, vuela: false, dano: 7, sonido: "zorro" },
   condor: { vida: 3, vel: 5, vuela: true, dano: 10, sonido: "ave" },
@@ -53,6 +57,10 @@ export interface Fiera {
   objetivo: Vector3;
   origen: Vector3;
   marca: Mesh | null;
+  /** Modelo 3D animado (el zorro usa un modelo real con caminar y correr). */
+  modelo?: Modelo | null;
+  /** Patas del cuerpo armado (para animar la marcha). */
+  patas?: { nodo: TransformNode; fase: number }[];
 }
 
 export interface ContextoFieras {
@@ -77,6 +85,7 @@ const ATAQUE: Record<Especie, { tipo: "salto" | "mordida" | "barrido" | "picada"
   anaconda: { tipo: "barrido", alcance: 3.4, aviso: 1.0, radio: 3.3, consejo: "🐍 ¡La anaconda barre el suelo! SALTA ⤴ por encima" },
   condor: { tipo: "picada", alcance: 99, aviso: 1.1, radio: 1.7, consejo: "🦅 ¡Mira la sombra en el suelo! Sal de ella RODANDO 💨" },
   murcielago: { tipo: "picada", alcance: 99, aviso: 0.6, radio: 1.4, consejo: "🦇 Los murciélagos bajan rápido: mira su sombra" },
+  jarjacha: { tipo: "salto", alcance: 7.5, aviso: 1.1, radio: 2.1, consejo: "🌫 ¡«Qar… qar…»! La Jarjacha embiste desde la neblina: ¡RUEDA 💨 a un lado!" },
 };
 const consejosDados = new Set<Especie>();
 
@@ -117,63 +126,168 @@ export class Fieras {
     const ojosPar = (y: number, z: number, sep: number, d = 0.12) => {
       for (const l of [-1, 1]) p(MeshBuilder.CreateSphere("ojo-fiera", { diameter: d, segments: 6 }, e), ojos, sep * l, y, z);
     };
+    const patas: { nodo: TransformNode; fase: number }[] = [];
+    /** Pata con muslo y canilla (el nodo gira en la cadera para caminar). */
+    const pata = (x: number, y: number, z: number, largo: number, grosor: number, matP: StandardMaterial, fase: number) => {
+      const nodo = new TransformNode("cadera", e);
+      nodo.parent = raiz;
+      nodo.position.set(x, y, z);
+      const muslo = MeshBuilder.CreateCapsule("muslo", { height: largo * 0.6, radius: grosor, tessellation: 8 }, e);
+      p(muslo, matP, 0, -largo * 0.25, 0).parent = nodo;
+      const canilla = MeshBuilder.CreateCapsule("canilla", { height: largo * 0.6, radius: grosor * 0.7, tessellation: 8 }, e);
+      p(canilla, matP, 0, -largo * 0.7, -0.04).parent = nodo;
+      const pie = MeshBuilder.CreateSphere("pie", { diameter: grosor * 2.4, segments: 6 }, e);
+      p(pie, matP, 0, -largo + grosor * 0.6, 0.05).parent = nodo;
+      pie.scaling.set(1, 0.6, 1.3);
+      patas.push({ nodo, fase });
+    };
     if (especie === "puma" || especie === "otorongo" || especie === "zorro") {
+      // Felino: cuerpo largo y flexible, cuello, cabeza redonda con hocico, cola larga en curva
       const piel = mat(especie === "puma" ? "#b98a52" : especie === "otorongo" ? "#d9a23a" : "#a5653a");
+      const claro = mat(especie === "puma" ? "#e3cba5" : especie === "otorongo" ? "#f2e2b8" : "#e8d8c0");
       const esc = especie === "zorro" ? 0.7 : 1;
-      const cuerpo = p(MeshBuilder.CreateSphere("cuerpo", { diameter: 1 }, e), piel, 0, 0.75 * esc, 0);
-      cuerpo.scaling.set(0.65 * esc, 0.6 * esc, 1.6 * esc);
-      p(MeshBuilder.CreateSphere("cabeza", { diameter: 0.6 * esc }, e), piel, 0, 1.05 * esc, 0.85 * esc);
-      if (especie === "zorro") {
-        const hocico = p(MeshBuilder.CreateCylinder("hocico", { height: 0.4, diameterTop: 0.05, diameterBottom: 0.25 }, e), piel, 0, 0.95 * esc, 1.15 * esc);
-        hocico.rotation.x = Math.PI / 2;
-        for (const l of [-1, 1]) p(MeshBuilder.CreateCylinder("oreja", { height: 0.3, diameterTop: 0, diameterBottom: 0.16 }, e), piel, 0.14 * l, 1.32 * esc, 0.82 * esc);
-        p(MeshBuilder.CreateSphere("cola", { diameter: 0.45 }, e), mat("#e8d8c0"), 0, 0.75 * esc, -1.05 * esc).scaling.set(0.7, 0.7, 1.6);
-      } else {
-        for (const l of [-1, 1]) p(MeshBuilder.CreateSphere("oreja", { diameter: 0.18 }, e), piel, 0.2 * l, 1.32, 0.8);
-        const cola = p(MeshBuilder.CreateCylinder("cola", { height: 1.1, diameter: 0.12 }, e), piel, 0, 0.9, -1.25);
-        cola.rotation.x = 1.0;
-        if (especie === "otorongo") {
-          const manchas = mat("#2a1a0a");
-          for (let i = 0; i < 14; i++) p(MeshBuilder.CreateSphere("mancha", { diameter: 0.13 }, e), manchas, Math.sin(i * 2.3) * 0.3, 0.75 + Math.cos(i * 3.1) * 0.25, -0.6 + i * 0.09);
+      raiz.scaling.setAll(esc);
+      const torso = MeshBuilder.CreateCapsule("cuerpo", { height: 1.7, radius: 0.32, tessellation: 12 }, e);
+      p(torso, piel, 0, 0.82, -0.05).rotation.x = Math.PI / 2;
+      const vientre = MeshBuilder.CreateCapsule("vientre", { height: 1.2, radius: 0.24, tessellation: 10 }, e);
+      p(vientre, claro, 0, 0.7, -0.05).rotation.x = Math.PI / 2;
+      const hombros = MeshBuilder.CreateSphere("hombros", { diameter: 0.7, segments: 10 }, e);
+      p(hombros, piel, 0, 0.92, 0.55);
+      const cuello = MeshBuilder.CreateCapsule("cuello", { height: 0.55, radius: 0.18, tessellation: 8 }, e);
+      p(cuello, piel, 0, 1.1, 0.78).rotation.x = 0.9;
+      const cabeza = MeshBuilder.CreateSphere("cabeza", { diameter: 0.5, segments: 12 }, e);
+      p(cabeza, piel, 0, 1.25, 1.02).scaling.set(1, 0.9, 1.05);
+      const hocico = MeshBuilder.CreateSphere("hocico", { diameter: 0.28, segments: 8 }, e);
+      p(hocico, claro, 0, 1.17, 1.24).scaling.set(1.1, 0.8, 0.9);
+      p(MeshBuilder.CreateSphere("nariz", { diameter: 0.08, segments: 6 }, e), mat("#2a1a14"), 0, 1.22, 1.36);
+      for (const l of [-1, 1]) {
+        const oreja = MeshBuilder.CreateCylinder("oreja", { height: 0.16, diameterTop: 0.02, diameterBottom: 0.15, tessellation: 6 }, e);
+        p(oreja, piel, 0.15 * l, 1.47, 0.98).rotation.z = -0.3 * l;
+      }
+      // Cola larga que cae y sube en la punta
+      const cola: Vector3[] = [];
+      for (let i = 0; i <= 10; i++) {
+        const t = i / 10;
+        cola.push(new Vector3(0, 0.85 - Math.sin(t * Math.PI * 0.8) * 0.45 + t * t * 0.3, -0.85 - t * 1.0));
+      }
+      p(MeshBuilder.CreateTube("cola", { path: cola, radiusFunction: (i) => 0.08 - i * 0.004, tessellation: 8 }, e), piel, 0, 0, 0);
+      if (especie === "otorongo") {
+        // Rosetas del jaguar
+        const manchas = mat("#2a1a0a");
+        for (let i = 0; i < 22; i++) {
+          const m = MeshBuilder.CreateTorus("roseta", { diameter: 0.13, thickness: 0.035, tessellation: 10 }, e);
+          const a = i * 2.39;
+          p(m, manchas, Math.sin(a) * 0.3, 0.86 + Math.cos(a * 1.7) * 0.18, -0.75 + (i / 22) * 1.4).rotation.z = Math.PI / 2 * Math.sign(Math.sin(a));
         }
       }
-      ojosPar(1.12 * esc, 1.13 * esc, 0.13 * esc);
-      for (const l of [-1, 1]) for (const f of [-1, 1]) p(MeshBuilder.CreateCylinder("pata", { height: 0.6 * esc, diameter: 0.17 * esc }, e), piel, 0.22 * l * esc, 0.3 * esc, 0.5 * f * esc);
+      ojosPar(1.33, 1.2, 0.11, 0.08);
+      for (const l of [-1, 1]) {
+        pata(0.2 * l, 0.75, 0.55, 0.78, 0.09, piel, l > 0 ? 0 : Math.PI);
+        pata(0.2 * l, 0.75, -0.62, 0.8, 0.1, piel, l > 0 ? Math.PI : 0);
+      }
+    } else if (especie === "jarjacha") {
+      // Jarjacha: figura de llama oscura, lana desgreñada, cuello largo y ojos rojos que brillan
+      const lana = mat("#2b2630");
+      const desgrenada = mat("#3b3440");
+      const torso = MeshBuilder.CreateCapsule("cuerpo", { height: 1.5, radius: 0.42, tessellation: 12 }, e);
+      p(torso, lana, 0, 1.25, 0).rotation.x = Math.PI / 2;
+      for (let i = 0; i < 14; i++) {
+        const mecha = MeshBuilder.CreateCylinder("mecha", { height: 0.45, diameterTop: 0.12, diameterBottom: 0.02, tessellation: 5 }, e);
+        p(mecha, desgrenada, Math.sin(i * 2.4) * 0.38, 0.95 + Math.cos(i * 1.3) * 0.08, -0.6 + (i / 14) * 1.2).rotation.z = Math.sin(i) * 0.4;
+      }
+      const cuello = MeshBuilder.CreateCapsule("cuello", { height: 1.1, radius: 0.16, tessellation: 8 }, e);
+      p(cuello, lana, 0, 1.9, 0.62).rotation.x = 0.25;
+      const cabeza = MeshBuilder.CreateSphere("cabeza", { diameter: 0.42, segments: 10 }, e);
+      p(cabeza, lana, 0, 2.45, 0.78).scaling.set(0.9, 0.85, 1.3);
+      for (const l of [-1, 1]) {
+        const oreja = MeshBuilder.CreateCylinder("oreja", { height: 0.3, diameterTop: 0.02, diameterBottom: 0.1, tessellation: 5 }, e);
+        p(oreja, lana, 0.12 * l, 2.72, 0.7).rotation.z = -0.25 * l;
+      }
+      ojosPar(2.52, 0.98, 0.1, 0.09);
+      for (const l of [-1, 1]) {
+        pata(0.22 * l, 1.05, 0.5, 1.05, 0.08, lana, l > 0 ? 0 : Math.PI);
+        pata(0.22 * l, 1.05, -0.55, 1.05, 0.09, lana, l > 0 ? Math.PI : 0);
+      }
     } else if (especie === "condor") {
+      // Cóndor andino: cuerpo negro, collar blanco, cabeza calva rojiza, alas enormes con "dedos" de plumas
       const negro = mat("#1f1f24");
       const blanco = mat("#f2f2f2");
-      const cuerpo = p(MeshBuilder.CreateSphere("cuerpo", { diameter: 1 }, e), negro, 0, 0, 0);
-      cuerpo.scaling.set(0.8, 0.6, 1.4);
-      p(MeshBuilder.CreateTorus("collar", { diameter: 0.55, thickness: 0.15 }, e), blanco, 0, 0.2, 0.55).rotation.x = Math.PI / 2.4;
-      p(MeshBuilder.CreateSphere("cabeza", { diameter: 0.45 }, e), mat("#c46a5a"), 0, 0.3, 0.8);
-      ojosPar(0.38, 0.98, 0.1, 0.09);
+      const cuerpo = p(MeshBuilder.CreateCapsule("cuerpo", { height: 1.5, radius: 0.36, tessellation: 12 }, e), negro, 0, 0, 0);
+      cuerpo.rotation.x = Math.PI / 2;
+      p(MeshBuilder.CreateTorus("collar", { diameter: 0.5, thickness: 0.18, tessellation: 16 }, e), blanco, 0, 0.12, 0.62).rotation.x = Math.PI / 2.3;
+      const cuello = p(MeshBuilder.CreateCapsule("cuello", { height: 0.4, radius: 0.08, tessellation: 8 }, e), mat("#8a3a32"), 0, 0.2, 0.82);
+      cuello.rotation.x = 1.2;
+      p(MeshBuilder.CreateSphere("cabeza", { diameter: 0.3, segments: 10 }, e), mat("#b2564a"), 0, 0.28, 1.0);
+      const pico = p(MeshBuilder.CreateCylinder("pico", { height: 0.2, diameterTop: 0.02, diameterBottom: 0.1, tessellation: 6 }, e), mat("#d9c9a0"), 0, 0.24, 1.17);
+      pico.rotation.x = 1.9;
+      ojosPar(0.34, 1.05, 0.09, 0.06);
       for (const l of [-1, 1]) {
-        const ala = p(MeshBuilder.CreateBox("ala", { width: 2.6, height: 0.06, depth: 0.8 }, e), negro, 1.4 * l, 0.1, 0);
+        // Ala: dos tramos y plumas primarias separadas en la punta
+        const ala = new TransformNode("ala", e);
+        ala.parent = raiz;
+        ala.position.set(0.3 * l, 0.12, 0);
         ala.metadata = { ala: l };
-        p(MeshBuilder.CreateBox("punta", { width: 0.6, height: 0.07, depth: 0.6 }, e), blanco, 2.7 * l, 0.1, -0.1).metadata = { ala: l };
+        const a1 = MeshBuilder.CreateBox("ala1", { width: 1.5, height: 0.06, depth: 0.85 }, e);
+        p(a1, negro, 0.75 * l, 0, 0).parent = ala;
+        const banda = MeshBuilder.CreateBox("ala-blanca", { width: 1.2, height: 0.065, depth: 0.3 }, e);
+        p(banda, blanco, 0.85 * l, 0.005, -0.18).parent = ala;
+        const a2 = MeshBuilder.CreateBox("ala2", { width: 1.1, height: 0.05, depth: 0.7 }, e);
+        p(a2, negro, 2.0 * l, 0, -0.05).parent = ala;
+        for (let k = 0; k < 5; k++) {
+          const pl = MeshBuilder.CreateBox("primaria", { width: 0.6, height: 0.03, depth: 0.1 }, e);
+          p(pl, negro, 2.75 * l, 0, 0.22 - k * 0.12).parent = ala;
+          pl.rotation.y = (k - 2) * 0.12 * l;
+        }
       }
+      const cola = p(MeshBuilder.CreateBox("cola", { width: 0.5, height: 0.05, depth: 0.5 }, e), negro, 0, -0.02, -0.95);
+      cola.rotation.x = -0.1;
     } else if (especie === "murcielago") {
       const piel = mat("#3a2a2a");
-      p(MeshBuilder.CreateSphere("cuerpo", { diameter: 0.45 }, e), piel, 0, 0, 0);
-      ojosPar(0.08, 0.2, 0.08, 0.07);
-      for (const l of [-1, 1]) p(MeshBuilder.CreateBox("ala", { width: 0.8, height: 0.03, depth: 0.4 }, e), piel, 0.5 * l, 0, 0).metadata = { ala: l };
+      const membrana = mat("#5a3e3e");
+      p(MeshBuilder.CreateCapsule("cuerpo", { height: 0.42, radius: 0.13, tessellation: 8 }, e), piel, 0, 0, 0);
+      p(MeshBuilder.CreateSphere("cabeza", { diameter: 0.2, segments: 8 }, e), piel, 0, 0.22, 0.05);
+      for (const l of [-1, 1]) {
+        p(MeshBuilder.CreateCylinder("oreja", { height: 0.12, diameterTop: 0, diameterBottom: 0.08, tessellation: 5 }, e), piel, 0.06 * l, 0.35, 0.04);
+        const ala = MeshBuilder.CreateDisc("ala", { radius: 0.45, tessellation: 5 }, e);
+        const ap = p(ala, membrana, 0.42 * l, 0.05, 0);
+        ap.rotation.x = Math.PI / 2;
+        ap.scaling.set(1.2, 0.7, 1);
+        ap.metadata = { ala: l };
+        (membrana as StandardMaterial).backFaceCulling = false;
+      }
+      ojosPar(0.24, 0.14, 0.05, 0.05);
     } else {
-      // Anaconda: segmentos que ondulan
+      // Anaconda: muchos segmentos pegados que ondulan (se ve como un cuerpo continuo)
       const verde = mat("#3f5a2a");
       const manchas = mat("#1a2412");
-      for (let i = 0; i < 9; i++) {
-        const s = p(MeshBuilder.CreateSphere("segmento", { diameter: 0.55 - i * 0.03, segments: 8 }, e), i % 2 ? manchas : verde, 0, 0.28, -i * 0.42);
+      const vientre = mat("#b8b07a");
+      const n = 24;
+      for (let i = 0; i < n; i++) {
+        const d = 0.5 - Math.max(0, i - 4) * 0.016;
+        const s = p(MeshBuilder.CreateSphere("segmento", { diameter: d, segments: 8 }, e), verde, 0, d * 0.4, -i * 0.2);
+        s.scaling.set(1, 0.75, 1.2);
         s.metadata = { seg: i };
+        if (i % 3 === 1) {
+          const m = p(MeshBuilder.CreateSphere("mancha", { diameter: d * 0.45, segments: 6 }, e), manchas, 0, d * 0.62, -i * 0.2);
+          m.scaling.set(1.2, 0.3, 1);
+          m.metadata = { seg: i };
+        }
+        if (i % 2 === 0) {
+          const v = p(MeshBuilder.CreateSphere("vientre", { diameter: d * 0.7, segments: 6 }, e), vientre, 0, d * 0.15, -i * 0.2);
+          v.scaling.set(1, 0.3, 1.2);
+          v.metadata = { seg: i };
+        }
       }
-      const cabeza = p(MeshBuilder.CreateSphere("cabeza", { diameter: 0.5 }, e), verde, 0, 0.32, 0.38);
-      cabeza.scaling.set(1, 0.7, 1.3);
-      ojosPar(0.45, 0.6, 0.13, 0.09);
+      const cabeza = p(MeshBuilder.CreateSphere("cabeza", { diameter: 0.5, segments: 12 }, e), verde, 0, 0.26, 0.32);
+      cabeza.scaling.set(1, 0.6, 1.4);
+      ojosPar(0.38, 0.5, 0.15, 0.08);
     }
+    if (patas.length) (raiz.metadata ??= {}).patas = patas;
     return { especie, raiz, colores, ojos };
   }
 
   aparecer(especie: Especie, donde: Vector3) {
-    const base = this.armar(especie);
+    const base = especie === "zorro" ? this.armarZorro() : this.armar(especie);
     base.raiz.position.copyFrom(donde);
     if (DATOS[especie].vuela) base.raiz.position.y = 7;
     const f: Fiera = {
@@ -191,11 +305,55 @@ export class Fieras {
       objetivo: donde.clone(),
       origen: donde.clone(),
       marca: null,
+      patas: (base.raiz.metadata as { patas?: { nodo: TransformNode; fase: number }[] } | null)?.patas,
     };
     this.lista.push(f);
     estallido(this.c.escena, donde.add(new Vector3(0, 1, 0)), ["#b388ff", "#8b3dff", "#2a0a5e"], 50, 6);
     rugido(DATOS[especie].sonido);
     return f;
+  }
+
+  /** Zorro andino: modelo 3D real (CC0 + rig CC BY, ver Créditos) con caminar, correr y husmear. */
+  private armarZorro(): Omit<Fiera, "vida" | "t" | "golpeHasta" | "quietoHasta" | "purificada" | "huida" | "dir" | "picada" | "fase" | "faseT" | "objetivo" | "origen" | "marca"> {
+    const e = this.c.escena;
+    const raiz = new TransformNode("fiera-zorro", e);
+    const colores: [StandardMaterial, Color3][] = [];
+    const ojos = new StandardMaterial("m-zorro-ojos", e);
+    ojos.emissiveColor = new Color3(1, 0.2, 0.9);
+    ojos.disableLighting = true;
+    const base = { especie: "zorro" as Especie, raiz, colores, ojos };
+    // Ojos brillantes de corrupción (se apagan al purificarlo)
+    for (const l of [-1, 1]) {
+      const o = MeshBuilder.CreateSphere("ojo-fiera", { diameter: 0.07, segments: 6 }, e);
+      o.material = ojos;
+      o.parent = raiz;
+      o.position.set(0.09 * l, 0.62, 0.62);
+    }
+    void crearModelo(e, "zorro.glb", raiz, 0.85)
+      .then((m) => {
+        if (raiz.isDisposed()) return;
+        for (const malla of m.mallas) {
+          const mat = malla.material as StandardMaterial | null;
+          if (!mat) continue;
+          const propio = mat.clone(`${mat.name}-${raiz.uniqueId}`);
+          const normal = new Color3(1, 1, 1);
+          const f = this.lista.find((x) => x.raiz === raiz);
+          propio.diffuseColor = f?.purificada ? normal : Color3.Lerp(normal, MORADO, 0.6);
+          propio.emissiveColor = f?.purificada ? new Color3(0.2, 0.2, 0.2) : MORADO.scale(0.3);
+          malla.material = propio;
+          colores.push([propio, normal]);
+        }
+        const f = this.lista.find((x) => x.raiz === raiz);
+        if (f) f.modelo = m;
+        (m as unknown as { tocar: (n: string) => void }).tocar("Walk");
+      })
+      .catch(() => {
+        // Sin modelo: usa el zorro armado con formas
+        const alt = this.armar("zorro");
+        alt.raiz.parent = raiz;
+        colores.push(...alt.colores);
+      });
+    return base;
   }
 
   /** La más cercana al jugador (para apuntar). */
@@ -238,7 +396,10 @@ export class Fieras {
     f.dir = Math.atan2(f.raiz.position.x - this.c.jugador().x, f.raiz.position.z - this.c.jugador().z);
     estallido(this.c.escena, f.raiz.position.add(new Vector3(0, 1, 0)), ["#7dffb0", "#ffffff", "#ffd166"], 90, 7);
     sonido.tesoro();
-    this.c.aviso(`✨ ¡Purificaste al ${NOMBRE_ESPECIE[f.especie]}! Vuelve tranquilo a su hogar.`, 2200);
+    this.c.aviso(
+      f.especie === "jarjacha" ? "🌫 La Jarjacha lanza un último «qar…» y se pierde en la neblina de la puna." : `✨ ¡Purificaste al ${NOMBRE_ESPECIE[f.especie]}! Vuelve tranquilo a su hogar.`,
+      2600
+    );
     this.c.alPurificar?.(f);
   }
 
@@ -249,8 +410,13 @@ export class Fieras {
       f.t += dt;
       const r = f.raiz;
       const d = DATOS[f.especie];
+      // Marcha: patas que se mueven (más rápido al atacar) y el zorro con su animación real
+      const corre = f.purificada || f.fase === "ataque";
+      const quieta = f.fase === "aviso" || f.fase === "recupera";
+      if (f.patas) for (const pt of f.patas) pt.nodo.rotation.x = quieta ? 0 : Math.sin(f.t * (corre ? 16 : 9) + pt.fase) * (corre ? 0.7 : 0.45);
+      if (f.modelo) (f.modelo as unknown as { tocar: (n: string) => void }).tocar(corre ? "Run" : quieta ? "Survey" : "Walk");
       // Aleteo
-      for (const m of r.getChildMeshes(true)) {
+      for (const m of r.getChildren() as TransformNode[]) {
         const meta = m.metadata as { ala?: number; seg?: number } | null;
         if (meta?.ala) m.rotation.z = Math.sin(f.t * (f.especie === "murcielago" ? 22 : 6)) * 0.5 * meta.ala;
         if (meta?.seg !== undefined) m.position.x = Math.sin(f.t * 4 - meta.seg * 0.7) * 0.25;
@@ -484,7 +650,8 @@ export class Fieras {
 /** Animales de cada ambiente. */
 export const FIERAS_DE: Record<string, Especie[]> = {
   templo: ["puma", "zorro", "puma"],
-  puna: ["condor", "zorro", "condor"],
+  puna: ["condor", "zorro", "condor", "jarjacha"],
   selva: ["otorongo", "anaconda", "murcielago", "murcielago"],
   plaza: ["zorro", "puma"],
+  costa: ["zorro", "condor", "zorro"],
 };

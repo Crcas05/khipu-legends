@@ -35,8 +35,16 @@ function preparar(original: string) {
   return { html, plano, nuevas };
 }
 
-/** Muestra una secuencia de líneas. Termina cuando el jugador lee la última. */
+/** Los diálogos se ponen en fila: si ya hay uno abierto, el nuevo espera su turno (no se mezclan). */
+let cola: Promise<void> = Promise.resolve();
 export function hablar(lineas: Linea[]): Promise<void> {
+  const turno = cola.then(() => hablarAhora(lineas));
+  cola = turno.catch(() => {});
+  return turno;
+}
+
+/** Muestra una secuencia de líneas. Termina cuando el jugador lee la última. */
+function hablarAhora(lineas: Linea[]): Promise<void> {
   const caja = document.getElementById("dialogo")!;
   const marco = document.getElementById("dialogo-retrato")!;
   const nombre = document.getElementById("dialogo-nombre")!;

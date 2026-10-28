@@ -31,7 +31,7 @@ export interface Mision {
   nombre: string;
   icono: string;
   lugar: string;
-  ambiente: "templo" | "puna" | "selva";
+  ambiente: "costa" | "templo" | "puna" | "selva";
   /** Quién la encarga en el pueblo. */
   quien: "mama" | "sisa" | "yachaq";
   pedido: Linea[];
@@ -102,9 +102,110 @@ def _cuenta(tipo):
 
 export const MISIONES: Mision[] = [
   // -------------------------------------------------------------------------
+  // COSTA (Lambayeque): el viaje empieza junto al mar. Python básico: variables, operadores e if.
+  {
+    id: "mullu",
+    numero: 1,
+    nombre: "El mullu de Naylamp",
+    icono: "🐚",
+    lugar: "Costa de Lambayeque",
+    ambiente: "costa",
+    quien: "mama",
+    pedido: [
+      { quien: "mama", texto: "{nombre}, un chaski llegó corriendo desde la costa norte, desde Lambayeque. Trae malas noticias del mar." },
+      { quien: "narrador", texto: "Cuenta la leyenda que hace siglos llegó por el mar Naylamp, con una flota de balsas y su corte. Uno de los suyos, Pita Zofi, tocaba el pututo; otro, Fonga Sigde, esparcía polvo de conchas donde él caminaba." },
+      { quien: "mama", texto: "Esas conchas son el mullu (spondylus): para los pueblos antiguos valía más que el oro. ¡Unos cangrejos-Bug se las llevaron de la playa!" },
+      { quien: "tuki", texto: "¡Kraa! Primero aprendemos lo básico de Python allá: variables, operaciones y decisiones con if. ¿Vamos al mar, {nombre}?" },
+    ],
+    amenaza: "Cangrejos-Bug y el Mullu Bug, su jefe",
+    aprendes: "Variables, textos, operadores e if",
+    dificultad: 1,
+    recompensa: 30,
+    logro: "mision-mullu",
+    exploracion: { tipo: "recoger", total: 5, objetivo: "Recupera las conchas de mullu", item: "concha de mullu" },
+    jefe: {
+      nombre: "Mullu Bug",
+      tipo: "bug",
+      color: "#e0603a",
+      tiempoAtaque: 50,
+      llega: [
+        { quien: "narrador", texto: "La arena se abre. Un Bug enorme sale del mar, con conchas de mullu pegadas al caparazón…" },
+        { quien: "tuki", texto: "¡Es el Mullu Bug! Aquí se pelea con runas: tu código mueve a Chaski. Empezamos con lo más básico." },
+      ],
+      derrota: [
+        { quien: "tuki", texto: "¡LO VENCISTE! El Mullu Bug soltó todas las conchas." },
+        { quien: "narrador", texto: "Los pescadores vuelven al mar en sus caballitos de totora, como lo hacen en esta costa desde hace siglos." },
+      ],
+    },
+    rondas: [
+      {
+        modo: "completar",
+        titulo: "Una variable guarda el mullu",
+        enunciado: "Guarda el texto <code>\"mullu\"</code> en la variable <code>concha</code> y luego <b>recupérala</b> con <code>recuperar(concha)</code>.",
+        teoria: "Una <b>variable</b> es un nombre que guarda un valor. Los textos (<b>str</b>) van entre comillas: <code>\"mullu\"</code>.",
+        bloques: ['"mullu"', "concha", "recuperar("],
+        plantilla: "concha = ___\nrecuperar(concha)",
+        preludio: 'enemigo = Enemigo("Mullu Bug", 30)',
+        comprobar: [
+          'if "___" in _codigo:',
+          '    _falla("Cambia ___ por el texto \\"mullu\\" (con comillas).")',
+          'elif "recuperar(concha)" not in _codigo.replace(" ", ""):',
+          '    _falla("Usa la variable: recuperar(concha). Así el valor sale de la caja.")',
+          'elif _recuperadas != ["mullu"]:',
+          '    _falla(f"Recuperaste {_recuperadas}. La variable concha debe valer \\"mullu\\".")',
+        ].join("\n"),
+        solucion: 'concha = "mullu"\nrecuperar(concha)',
+        pista: 'Escribe: concha = "mullu"  (el texto va entre comillas).',
+      },
+      {
+        modo: "completar",
+        titulo: "¿Cuántos golpes? (operadores)",
+        enunciado: "El Mullu Bug tiene <b>30</b> de vida y cada golpe quita <b>10</b>. Calcula los golpes con el operador de <b>división entera</b>.",
+        teoria: "<code>//</code> divide sin decimales: <code>30 // 10</code> da <code>3</code>. En cambio <code>/</code> da <code>3.0</code> (un <b>float</b>), y <code>range()</code> solo acepta enteros.",
+        bloques: ["//", "/", "*", "+"],
+        plantilla: "vida = 30\ngolpe = 10\ngolpes = vida ___ golpe\nprint(\"Golpes:\", golpes)\nfor i in range(golpes):\n    atacar()",
+        preludio: 'enemigo = Enemigo("Mullu Bug", 30)',
+        comprobar: [
+          "if enemigo.vida > 0:",
+          '    _falla(f"Quedó con {enemigo.vida} de vida. ¿Cuántos golpes de 10 hacen falta para 30?")',
+          'elif _cuenta("atacar") != 3:',
+          '    _falla(f"Atacaste {_cuenta(\'atacar\')} veces; bastaban 3.")',
+          'elif "//" not in _codigo:',
+          '    _falla("Usa el operador // (división entera).")',
+        ].join("\n"),
+        solucion: "vida = 30\ngolpe = 10\ngolpes = vida // golpe\nprint(\"Golpes:\", golpes)\nfor i in range(golpes):\n    atacar()",
+        pista: "Cambia ___ por //   (30 // 10 = 3).",
+      },
+      {
+        modo: "libre",
+        titulo: "Decide con if",
+        enunciado: "El Mullu Bug se cubre con un <b>escudo</b> de conchas. <b>Si</b> <code>enemigo.escudo</code> es verdadero, rómpelo con <code>romper_escudo()</code>; después ataca <b>2 veces</b>.",
+        teoria: "<code>if condición:</code> ejecuta lo que está con sangría <b>solo si</b> la condición es <code>True</code>. Los valores <code>True</code>/<code>False</code> son <b>booleanos</b>.",
+        bloques: ["if", "enemigo.escudo", ":", "romper_escudo()", "atacar()", "    "],
+        plantilla: "# El enemigo tiene escudo (enemigo.escudo vale True)\n",
+        preludio: 'enemigo = Enemigo("Mullu Bug", 20, escudo=True)',
+        comprobar: [
+          'if "if" not in _codigo:',
+          '    _falla("Usa un if para decidir: if enemigo.escudo:")',
+          'elif any(a["a"] == "rebota" for a in _acciones):',
+          '    _falla("¡Tu golpe rebotó en el escudo! Primero rómpelo dentro del if.")',
+          "elif enemigo.vida > 0:",
+          '    _falla(f"Le quedó {enemigo.vida} de vida: ataca 2 veces después del if.")',
+        ].join("\n"),
+        solucion: "if enemigo.escudo:\n    romper_escudo()\natacar()\natacar()",
+        pista: "if enemigo.escudo:  (con dos puntos) y debajo, con 4 espacios: romper_escudo(). Luego, sin sangría, atacar() dos veces.",
+      },
+    ],
+    ficha: {
+      nombre: "Naylamp y el mullu",
+      icono: "🐚",
+      dato: "El cronista Miguel Cabello Valboa recogió en 1586 la leyenda de Naylamp: llegó a Lambayeque por mar con balsas y trajo un ídolo de piedra verde, Yampallec. El mullu (Spondylus) se traía desde el mar cálido del norte y era muy valioso en todo el mundo andino.",
+    },
+  },
+  // -------------------------------------------------------------------------
   {
     id: "oro",
-    numero: 1,
+    numero: 2,
     nombre: "El oro del Inti",
     icono: "🌞",
     lugar: "Qorikancha, Cusco",
@@ -201,7 +302,7 @@ export const MISIONES: Mision[] = [
   // -------------------------------------------------------------------------
   {
     id: "vicuna",
-    numero: 2,
+    numero: 3,
     nombre: "Guardianes de la vicuña",
     icono: "🦙",
     lugar: "Pampa Galeras, Ayacucho",
@@ -296,7 +397,7 @@ export const MISIONES: Mision[] = [
   // -------------------------------------------------------------------------
   {
     id: "chullachaqui",
-    numero: 3,
+    numero: 4,
     nombre: "Rescate en la selva",
     icono: "🌳",
     lugar: "Selva del Ucayali",

@@ -47,7 +47,9 @@ function cargar(escena: Scene, archivo: string): Promise<AssetContainer> {
 
 export type Animacion =
   | "Idle" | "Walking_A" | "Running_A" | "Running_B" | "Cheer" | "Spellcast_Shoot" | "Hit_A" | "Interact" | "Jump_Full_Short" | "Jump_Full_Long" | "Block"
-  | "Dodge_Forward" | "Dodge_Left" | "Dodge_Right" | "Throw" | "1H_Melee_Attack_Chop" | "1H_Ranged_Shoot" | "PickUp" | "Unarmed_Melee_Attack_Kick";
+  | "Dodge_Forward" | "Dodge_Left" | "Dodge_Right" | "Throw" | "1H_Melee_Attack_Chop" | "1H_Ranged_Shoot" | "PickUp" | "Unarmed_Melee_Attack_Kick"
+  // Zorro (modelo Fox de Khronos)
+  | "Survey" | "Walk" | "Run";
 
 /** Un personaje animado. Se coloca dentro de "padre" (el nodo que el juego mueve). */
 export class Modelo {
@@ -56,6 +58,10 @@ export class Modelo {
   private actual: AnimationGroup | null = null;
   private unaVez = 0;
   cabeza: TransformNode | null = null;
+  /** Huesos "handslot" del modelo: ahí se sujetan armas y el pututo. */
+  manoDerecha: TransformNode | null = null;
+  manoIzquierda: TransformNode | null = null;
+  nodos: TransformNode[] = [];
 
   constructor(raiz: TransformNode, grupos: AnimationGroup[], mallas: AbstractMesh[], nodos: TransformNode[]) {
     for (const g of grupos) {
@@ -68,6 +74,9 @@ export class Modelo {
     }
     this.mallas = mallas.filter((m): m is Mesh => m instanceof Mesh);
     this.cabeza = nodos.find((n) => n.name.replace(/^Clone of /, "") === "head") ?? null;
+    this.nodos = nodos;
+    this.manoDerecha = nodos.find((n) => n.name.replace(/^Clone of /, "") === "handslot.r") ?? null;
+    this.manoIzquierda = nodos.find((n) => n.name.replace(/^Clone of /, "") === "handslot.l") ?? null;
     void raiz;
     this.tocar("Idle");
   }

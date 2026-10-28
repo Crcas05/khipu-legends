@@ -5,7 +5,9 @@
 import { Scene } from "@babylonjs/core/scene";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { Quaternion } from "@babylonjs/core/Maths/math.vector";
 import { armaActual } from "./armas";
+import { crearPututo, crearArmaProp } from "./props";
 import { Mesh } from "@babylonjs/core/Meshes/mesh";
 import { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial";
 import { DynamicTexture } from "@babylonjs/core/Materials/Textures/dynamicTexture";
@@ -100,6 +102,72 @@ export class Chaski {
     if (this.esFantasma) this.fantasma();
   }
 
+  // --- Objetos en la mano: arma y pututo ---
+  private armaProp: TransformNode | null = null;
+  private armaId = "";
+  private pututo: TransformNode | null = null;
+  private pututoHasta = 0;
+  private giroHasta = 0;
+  private reloj = 0;
+  /** Escala de los objetos dentro del hueso de la mano. */
+  escalaMano = 1.7;
+
+  /** Pone en la mano derecha el arma que está en uso (y la cambia si cambió). */
+  empunar(id = armaActual().id) {
+    const mano = this.modelo?.manoDerecha;
+    if (!mano || id === this.armaId) return;
+    this.armaProp?.dispose();
+    this.armaId = id;
+    const p = crearArmaProp(this.raiz.getScene(), id);
+    p.parent = mano;
+    p.scaling.setAll(this.escalaMano);
+    p.rotationQuaternion = Quaternion.Identity();
+    this.armaProp = p;
+    for (const m of p.getChildMeshes()) this.mallas.push(m as Mesh);
+  }
+
+  /** Chaski se lleva el pututo a la boca y lo sopla (anuncia una misión, una alarma o un mensaje). */
+  soplarPututo(segundos = 2) {
+    const cabeza = this.modelo?.cabeza;
+    if (!cabeza) return;
+    if (!this.pututo) {
+      this.pututo = crearPututo(this.raiz.getScene());
+      this.pututo.parent = cabeza;
+      this.pututo.scaling.setAll(0.95);
+      // La boquilla en la boca; la caracola sale hacia adelante y a un lado
+      this.pututo.position.set(-0.04, 0.1, 0.52);
+      this.pututo.rotation.set(-1.35, 0, 0.75);
+    }
+    this.pututo.setEnabled(true);
+    this.armaProp?.setEnabled(false);
+    this.modelo?.accion(this.modelo.tiene("Interact") ? "Interact" : "Cheer", segundos);
+    this.pututoHasta = this.reloj + segundos;
+  }
+
+  private giro = 0;
+  /** El arma sigue a la mano, pero orientada al mundo (la huaraca cuelga, la lanza va de pie, el arco al frente). */
+  private orientarArma(dt: number) {
+    const p = this.armaProp;
+    const mano = p?.parent as TransformNode | null;
+    if (!p || !mano || !p.isEnabled()) return;
+    if (this.reloj < this.giroHasta) this.giro += dt * 26;
+    else this.giro = 0;
+    mano.computeWorldMatrix(true);
+    const qMano = mano.absoluteRotationQuaternion.clone();
+    const yaw = this.raiz.rotation.y;
+    let qMundo: Quaternion;
+    if (this.armaId === "huaraca" || this.armaId === "liwi") qMundo = Quaternion.RotationYawPitchRoll(yaw + this.giro, 0, 0);
+    else if (this.armaId === "arco") qMundo = Quaternion.RotationYawPitchRoll(yaw, 0, 0);
+    else qMundo = Quaternion.RotationYawPitchRoll(yaw, 0.25, 0); // lanza y champi casi de pie, un poco al frente
+    // local = inversa(mano) * mundo
+    p.rotationQuaternion = Quaternion.Inverse(qMano).multiply(qMundo);
+  }
+
+  /** Gira la huaraca antes de soltar la piedra. */
+  private girarArma() {
+    if (this.armaId === "huaraca" || this.armaId === "liwi") this.giroHasta = this.reloj + 0.55;
+  }
+
   get tieneModelo() {
     return this.modelo !== null;
   }
@@ -110,6 +178,8 @@ export class Chaski {
     if (!m) return;
     // Cada arma andina tiene su propio movimiento
     const arma = armaActual().id;
+    this.empunar(arma);
+    this.girarArma();
     if (arma === "champi" && m.tiene("1H_Melee_Attack_Chop")) m.accion("1H_Melee_Attack_Chop", 0.75);
     else if (arma === "arco" && m.tiene("1H_Ranged_Shoot")) m.accion("1H_Ranged_Shoot", 0.8);
     else if (m.tiene("Throw")) m.accion("Throw", 0.7);
@@ -352,6 +422,12 @@ export class Chaski {
   /** dx, dz: dirección de movimiento (-1 a 1). dt en segundos. */
   actualizar(dx: number, dz: number, dt: number, sprint = false, girar = true) {
     const fuerza = Math.min(1, Math.hypot(dx, dz));
+    this.reloj += dt;
+    if (this.pututo?.isEnabled() && this.reloj > this.pututoHasta) {
+      this.pututo.setEnabled(false);
+      this.armaProp?.setEnabled(true);
+    }
+    this.orientarArma(dt);
     if (this.modelo) {
       if (fuerza > 0.05 && girar) {
         const objetivo = Math.atan2(dx, dz);

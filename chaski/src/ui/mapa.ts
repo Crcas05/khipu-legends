@@ -4,6 +4,14 @@
 import { ZONAS, ZONA_VALLE } from "../datos/zonas";
 import { estado, yaPaso } from "../estado";
 import { sonido } from "../sonido";
+import { MISIONES } from "../datos/misiones";
+
+/** Dónde está cada misión en el mapa (%), según su lugar real. */
+const POS_MISION: Record<string, [number, number]> = { mullu: [16, 17], oro: [62, 74], vicuna: [52, 77], chullachaqui: [74, 46] };
+const misionAbierta = (numero: number) => {
+  const anterior = MISIONES.find((x) => x.numero === numero - 1);
+  return !anterior || !!estado.misiones[anterior.id];
+};
 
 type Nodo = { id: string; numero: number; nombre: string; lugar: string; region: string; cultura: string; temas: string; mapa: [number, number] };
 
@@ -94,11 +102,12 @@ const FONDO_SVG = `
 export function abrirMapa(): Promise<string | null> {
   const caja = document.getElementById("mapa-peru")!;
   const hechas = NODOS.filter((n) => zonaHecha(n.id)).length;
+  const misionesHechas = MISIONES.filter((m) => estado.misiones[m.id]).length;
   const camino = NODOS.map((n) => `${n.mapa[0]},${n.mapa[1]}`).join(" ");
   caja.innerHTML = `
     <div class="mapa-marco">
       <header class="mapa-cabecera">
-        <div><h2>🗺 MAPA DEL VIAJE</h2><p>Recorre el Perú y aprende Python y SQL · <b>${hechas}/10</b> zonas</p></div>
+        <div><h2>🗺 MAPA DEL VIAJE</h2><p>Recorre el Perú: costa, sierra y selva · <b>${hechas}/10</b> zonas · <b>${misionesHechas}/${MISIONES.length}</b> misiones</p></div>
         <button class="boton-secundario mapa-pueblo" id="mapa-pueblo">🏘 Pueblo · Misiones</button>
         <button class="cerrar" aria-label="Cerrar">✕</button>
       </header>
@@ -113,6 +122,12 @@ export function abrirMapa(): Promise<string | null> {
             const actual = abierta && !hecha;
             return `<button class="mapa-nodo ${hecha ? "hecha" : ""} ${actual ? "actual" : ""} ${abierta ? "" : "bloqueada"}" data-i="${i}" style="left:${n.mapa[0]}%;top:${n.mapa[1]}%">
               <span class="num">${hecha ? "✓" : abierta ? n.numero : "🔒"}</span><span class="nombre">${n.numero}. ${n.nombre}<small>${n.temas.split("·").slice(0, 2).join("·").replace(/🏆/g, "").trim()}</small></span></button>`;
+          }).join("")}
+          ${MISIONES.map((m) => {
+            const [x, y] = POS_MISION[m.id] ?? [50, 50];
+            const hecha = !!estado.misiones[m.id];
+            const abierta = misionAbierta(m.numero);
+            return `<button class="mapa-mision ${hecha ? "hecha" : ""} ${abierta ? "" : "bloqueada"}" data-m="${m.id}" style="left:${x}%;top:${y}%" title="Misión ${m.numero}: ${m.nombre}"><span>${hecha ? "✓" : abierta ? m.icono : "🔒"}</span></button>`;
           }).join("")}
         </div>
         <aside class="mapa-detalle" id="mapa-detalle"><p class="gris">Toca una zona del mapa.</p></aside>
@@ -150,6 +165,31 @@ export function abrirMapa(): Promise<string | null> {
         cerrar(n.id);
       });
     };
+    caja.querySelectorAll<HTMLButtonElement>(".mapa-mision").forEach((b) =>
+      b.addEventListener("click", () => {
+        sonido.toque();
+        const m = MISIONES.find((x) => x.id === b.dataset.m)!;
+        const abierta = misionAbierta(m.numero);
+        const estrellas = estado.misiones[m.id] ?? 0;
+        caja.querySelectorAll(".mapa-nodo, .mapa-mision").forEach((n) => n.classList.remove("elegida"));
+        b.classList.add("elegida");
+        detalle.innerHTML = `
+          <p class="nota">MISIÓN ${m.numero} · ${m.lugar.toUpperCase()}</p>
+          <h3>${m.icono} ${m.nombre}</h3>
+          <p class="mapa-cultura">⚠ ${m.amenaza}</p>
+          <p class="mapa-temas">📘 ${m.aprendes}</p>
+          ${estrellas ? `<p class="mapa-cultura">${"⭐".repeat(estrellas)}${"☆".repeat(3 - estrellas)}</p>` : ""}
+          ${
+            abierta
+              ? `<button class="boton-oro" id="mapa-ir">${estrellas ? "↺ Repetir misión" : "▶ Ir a la misión"}</button>`
+              : `<p class="bloqueo">🔒 Primero termina la misión ${m.numero - 1}.</p>`
+          }`;
+        detalle.querySelector("#mapa-ir")?.addEventListener("click", () => {
+          sonido.toque();
+          cerrar(`mision:${m.id}`);
+        });
+      })
+    );
     caja.querySelectorAll<HTMLButtonElement>(".mapa-nodo").forEach((b) =>
       b.addEventListener("click", () => {
         sonido.toque();

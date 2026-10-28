@@ -65,6 +65,7 @@ import { crearModelo, ponerChullo, ponerMontera } from "./modelos";
 import { crearChorro, estallido, crearPolvo, crearDestello, Sacudida } from "./efectos";
 import type { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
 import { liberarAnimales, abrirKhipuFauna } from "./ui/khipuFauna";
+import { abrirCreditos } from "./ui/creditos";
 import { saltar as iniciarSalto, empezarEsquive, esquivando, actualizarSalto, puedeEsquivar, enElAire, invulnerable } from "./movimiento";
 
 type Calidad = "bajo" | "medio" | "alto";
@@ -875,8 +876,10 @@ const ataque = new AtaquePueblo({
   objetivo: (t) => fijarObjetivo(t),
   cambio: () => actualizarBotones(),
   chaskiAlarma: async () => {
+    let waman: Chaski | null = null;
     const c = await llegaChaskiCorredor(escena, chaski.raiz.position, async () => {
       const corredor = new Chaski(escena, true);
+      waman = corredor;
       try {
         const m = await crearModelo(escena, "chaski.glb", corredor.raiz, 2.6);
         // Waman: vincha blanca con un penacho de plumas (así iban los chaskis) y su pututo
@@ -912,6 +915,8 @@ const ataque = new AtaquePueblo({
     });
     aviso("📯 ¡Se escucha un pututo! Un chaski viene corriendo por el camino…", 3000);
     await c.llega;
+    // Waman llega y sopla su pututo para anunciar el peligro
+    (waman as Chaski | null)?.soplarPututo(2.4);
     return c.vete;
   },
   mamaLibre: () => {
@@ -988,6 +993,14 @@ async function irAlMapa() {
   if (destino === "pueblo") {
     await viajarA("plaza");
     if (llego("completo")) aviso("🏘 Pueblo de Qhapaq: busca a quienes tienen ❗ para recibir misiones.", 3500);
+    return;
+  }
+  if (destino.startsWith("mision:")) {
+    const m = MISIONES.find((x) => `mision:${x.id}` === destino);
+    if (m) {
+      if (region !== "plaza") await viajarA("plaza");
+      void iniciarMision(m);
+    }
     return;
   }
   if (destino === "valle") {
@@ -1099,7 +1112,8 @@ const misionJuego = new MisionJuego({
 /** La misión que encarga esta persona (si ya está disponible). */
 function misionPara(quien: "mama" | "sisa" | "yachaq"): Mision | null {
   if (!llego("completo")) return null;
-  const m = MISIONES.find((x) => x.quien === quien);
+  // La primera misión pendiente de esa persona (o la última, para repetirla)
+  const m = MISIONES.find((x) => x.quien === quien && !estado.misiones[x.id]) ?? MISIONES.filter((x) => x.quien === quien).pop();
   if (!m) return null;
   const anterior = MISIONES.find((x) => x.numero === m.numero - 1);
   if (anterior && !estado.misiones[anterior.id]) return null;
@@ -1134,6 +1148,8 @@ async function iniciarMision(m: Mision) {
   if (region === "mision") return;
   misionActual = m;
   await viajarA("mision");
+  // Chaski sopla el pututo: empieza la misión
+  window.setTimeout(() => sonido.pututu(), 700);
   aviso(`${m.icono} ${m.nombre}: ${m.exploracion.objetivo}. ¡Sigue la flecha!`, 3500);
 }
 
@@ -1150,7 +1166,7 @@ async function terminarMision(r: { ganado: boolean; errores: number; golpes: num
   ganarKallpa(m.recompensa);
   desbloquear(m.logro);
   if (n === 3) desbloquear("tres-estrellas");
-  cambiarMusica(m.ambiente === "puna" ? "altiplano" : m.ambiente === "selva" ? "selva" : "andes", true);
+  cambiarMusica(m.ambiente === "puna" ? "altiplano" : m.ambiente === "selva" ? "selva" : m.ambiente === "costa" ? "costa" : "andes", true);
   const eleccion = await resultadoMision(m, n, r.errores, r.golpes);
   // Los animales purificados se liberan con Python y se anotan con SQL
   if (misionJuego.liberados.length) {
@@ -1459,6 +1475,7 @@ $("boton-huaraca").addEventListener("pointerdown", (e) => {
 });
 $("boton-arma").addEventListener("click", () => {
   const a = siguienteArma();
+  chaski.empunar(a.id);
   sonido.toque();
   aviso(`${a.icono} ${a.nombre}: ${a.como}`, 2000);
   actualizarBotones();
@@ -1474,6 +1491,7 @@ $("chip-armas").addEventListener("click", () => {
   sonido.toque();
   void enCalma(async () => {
     const a = await abrirArmeria();
+    chaski.empunar();
     if (a) aviso(`${a.icono} ¡${a.nombre} forjado con tu código! ${a.como}`, 3500);
   });
 });
@@ -1681,6 +1699,8 @@ window.addEventListener("keydown", (e) => {
   if (k === "q") enCalma(abrirSimiQillqa);
   if (k === "c" && desbloqueadas().length > 1) {
     const a = siguienteArma();
+    chaski.empunar(a.id);
+  chaski.empunar(a.id);
     aviso(`${a.icono} ${a.nombre}`, 1200);
     actualizarBotones();
   }
@@ -1700,6 +1720,10 @@ window.addEventListener("keydown", (e) => {
   }
 });
 window.addEventListener("keyup", (e) => teclas.delete(e.key.toLowerCase()));
+// Cuando suena el pututo, Chaski se lo lleva a la boca (si está en escena)
+window.addEventListener("pututu", () => {
+  if (jugando && chaski.raiz.isEnabled()) chaski.soplarPututo(2);
+});
 
 // ---------------------------------------------------------------------------
 // Medidor de fluidez (baja la calidad solo si el celular sufre)
@@ -1846,9 +1870,9 @@ escena.onBeforeRenderObservable.add(() => {
       const llama = fotoClave === "yaru";
       camara.alpha = -Math.PI / 2 - 0.12;
       camara.beta = 1.4;
-      camara.radius = llama ? 2.5 : fotoClave === "chaski" ? 2.8 : 2.4;
+      camara.radius = llama ? 2.5 : fotoClave === "cuerpo" ? 6.5 : fotoClave === "chaski" ? 2.8 : 2.4;
       camara.targetScreenOffset.set(0, 0);
-      camara.target.set(0, llama ? 1.0 : fotoClave === "chaski" ? 1.7 : 1.5, 0);
+      camara.target.set(0, llama ? 1.0 : fotoClave === "cuerpo" ? 1.3 : fotoClave === "chaski" ? 1.7 : 1.5, 0);
     }
     const vertical = document.body.classList.contains("vertical");
     const k = fotoClave ? 0 : Math.min(1, dt * 3);
@@ -1911,6 +1935,13 @@ escena.onBeforeRenderObservable.add(() => {
     if (m) {
       m.visibility = 0.28;
       transparentes.push(m);
+      // Si tapa un muro del templo, también su banda de oro (si no, queda una franja amarilla flotando)
+      if (m.name === "muro-templo")
+        for (const otra of escena.meshes)
+          if (otra.name === "banda-oro" && Math.abs(otra.position.x - m.position.x) < 0.1 && Math.abs(otra.position.z - m.position.z) < 0.1) {
+            (otra as Mesh).visibility = 0.28;
+            transparentes.push(otra as Mesh);
+          }
     }
   }
 
@@ -2191,6 +2222,10 @@ $("menu-personajes").addEventListener("click", async () => {
   await elegirHeroe(true);
   $("portada").hidden = false;
 });
+$("menu-creditos").addEventListener("click", () => {
+  sonido.toque();
+  void abrirCreditos();
+});
 $("menu-logros").addEventListener("click", async () => {
   sonido.toque();
   await abrirProgreso();
@@ -2228,6 +2263,7 @@ restaurarMundo();
     const vestirChaski = async (heroe: Chaski) => {
       const m = await crearModelo(escena, "chaski.glb", heroe.raiz, 2.7);
       heroe.vestir(m, m.cabeza ? ponerChullo(escena, m.cabeza, 1.12) : []);
+      heroe.empunar();
     };
     await vestirChaski(chaski);
     for (const e of ecos) await vestirChaski(e);
@@ -2311,10 +2347,11 @@ if (new URLSearchParams(location.search).has("prueba")) {
       const m = MISIONES.find((x) => x.id === id);
       if (m) void iniciarMision(m);
     },
+    chaski,
     fotoRetrato: (clave: string) => {
       fotoClave = clave;
       document.body.classList.add("modo-foto");
-      const nodos: Record<string, TransformNode> = { chaski: chaski.raiz, amaru: amaru.raiz, killa: killa.raiz, yaru: yaruGuia.raiz };
+      const nodos: Record<string, TransformNode> = { chaski: chaski.raiz, cuerpo: chaski.raiz, amaru: amaru.raiz, killa: killa.raiz, yaru: yaruGuia.raiz };
       for (const [k, n] of Object.entries(nodos)) {
         n.setEnabled(k === clave);
         if (k === clave) {

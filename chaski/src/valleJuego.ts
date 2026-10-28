@@ -1,6 +1,7 @@
 // La jugabilidad del Valle Sagrado: mini-Bugs, huaraca (honda andina), rescates
 // con código, inventario (un diccionario de Python), mapa y progreso.
 
+import { armarBicho, formaDe } from "./bichos";
 import { esquivoElGolpe } from "./movimiento";
 import { Scene } from "@babylonjs/core/scene";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
@@ -97,15 +98,7 @@ export class ValleJuego {
     const centro = SITIOS[s];
     for (let i = 0; i < n; i++) {
       const raiz = new TransformNode("minibug", this.c.escena);
-      const cuerpo = MeshBuilder.CreateBox("glitch", { size: 0.8 }, this.c.escena);
-      cuerpo.material = this.bugMat;
-      cuerpo.parent = raiz;
-      for (const lado of [-1, 1]) {
-        const ojo = MeshBuilder.CreateSphere("glitch", { diameter: 0.22, segments: 6 }, this.c.escena);
-        ojo.material = this.ojoMat;
-        ojo.parent = raiz;
-        ojo.position.set(0.18 * lado, 0.12, 0.41);
-      }
+      armarBicho(this.c.escena, raiz, "arana", this.bugMat, this.ojoMat, 1.1);
       const a = (i / n) * Math.PI * 2;
       const casa = centro.add(new Vector3(Math.sin(a) * 4, 0, Math.cos(a) * 4 - 1));
       raiz.position.copyFrom(casa);
@@ -208,7 +201,7 @@ export class ValleJuego {
         const vuelta = b.casa.add(new Vector3(Math.sin(b.t) * 1.2, 0, Math.cos(b.t) * 1.2));
         r.position = Vector3.Lerp(r.position, vuelta, Math.min(1, dt * 1.5));
       }
-      r.position.y = 0.7 + Math.abs(Math.sin(b.t * 6)) * 0.35;
+      r.position.y = Math.abs(Math.sin(b.t * 6)) * 0.08;
       r.rotation.y = Math.atan2(p.x - r.position.x, p.z - r.position.z);
       r.scaling.setAll(this.tiempo < b.golpeHasta ? 1.3 : 1);
       // Muerde si está pegado

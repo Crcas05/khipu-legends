@@ -26,6 +26,7 @@ export class Jefe {
   mallas: Mesh[] = [];
   private nucleo: Mesh;
   private orbitales: Mesh[] = [];
+  private alas: { m: Mesh; lado: number }[] = [];
   private t = 0;
   private destello = 0;
   vidaMax = 120;
@@ -52,11 +53,47 @@ export class Jefe {
       this.mallas.push(mesh);
       return mesh;
     };
-    this.nucleo = m(MeshBuilder.CreateBox("jefe-nucleo", { size: 2.4 }, escena), morado);
-    for (let i = 0; i < 12; i++) this.orbitales.push(m(MeshBuilder.CreateBox("jefe-pieza", { size: 0.45 + (i % 3) * 0.15 }, escena), i % 2 ? claro : morado));
+    // El jefe ya no es un cubo: es un gran escarabajo volador corrompido (cuerpo acorazado, alas que
+    // zumban, mandíbulas) rodeado de fragmentos de código roto que giran.
+    this.nucleo = m(MeshBuilder.CreateSphere("jefe-nucleo", { diameter: 2.2, segments: 18 }, escena), morado);
+    this.nucleo.scaling.set(1, 0.8, 1.35);
+    const cabeza = m(MeshBuilder.CreateSphere("jefe-cabeza", { diameter: 1.3, segments: 14 }, escena), claro);
+    cabeza.position.set(0, 0.15, 1.35);
     for (const lado of [-1, 1]) {
-      m(MeshBuilder.CreateSphere("jefe-ojo", { diameter: 0.7, segments: 10 }, escena), blanco).position.set(0.55 * lado, 0.35, 1.25);
-      m(MeshBuilder.CreateSphere("jefe-pupila", { diameter: 0.32, segments: 8 }, escena), rojo).position.set(0.55 * lado, 0.32, 1.52);
+      const mand = m(MeshBuilder.CreateCylinder("jefe-mandibula", { height: 0.9, diameterTop: 0.02, diameterBottom: 0.25, tessellation: 6 }, escena), morado);
+      mand.position.set(0.35 * lado, -0.25, 1.95);
+      mand.rotation.set(1.4, 0, -0.5 * lado);
+      const antena = m(MeshBuilder.CreateCylinder("jefe-antena", { height: 1.4, diameterTop: 0.02, diameterBottom: 0.07, tessellation: 5 }, escena), claro);
+      antena.position.set(0.3 * lado, 0.85, 1.7);
+      antena.rotation.set(0.6, 0, -0.45 * lado);
+      for (let k = 0; k < 3; k++) {
+        const pata = m(MeshBuilder.CreateCylinder("jefe-pata", { height: 1.3, diameterTop: 0.12, diameterBottom: 0.04, tessellation: 6 }, escena), morado);
+        pata.position.set(0.85 * lado, -0.75, 0.6 - k * 0.6);
+        pata.rotation.z = lado * 0.5;
+      }
+    }
+    // Alas: dos pares translúcidos que zumban
+    const alaMat = claro.clone("m-jefe-ala");
+    alaMat.alpha = 0.55;
+    alaMat.backFaceCulling = false;
+    for (const lado of [-1, 1])
+      for (const k of [0, 1]) {
+        const ala = m(MeshBuilder.CreateDisc("jefe-ala", { radius: 1.5 - k * 0.35, tessellation: 18 }, escena), alaMat);
+        ala.scaling.set(1.6, 0.6, 1);
+        ala.setPivotPoint(new Vector3(-1.4 * lado, 0, 0));
+        ala.position.set(1.4 * lado + 0.2 * lado, 0.85, -0.2 - k * 0.7);
+        ala.rotation.x = Math.PI / 2;
+        this.alas.push({ m: ala, lado });
+      }
+    // Fragmentos de código roto (esquirlas triangulares brillantes)
+    for (let i = 0; i < 12; i++) {
+      const frag = m(MeshBuilder.CreateDisc("jefe-pieza", { radius: 0.3 + (i % 3) * 0.1, tessellation: 3 }, escena), i % 2 ? claro : morado);
+      (frag.material as StandardMaterial).backFaceCulling = false;
+      this.orbitales.push(frag);
+    }
+    for (const lado of [-1, 1]) {
+      m(MeshBuilder.CreateSphere("jefe-ojo", { diameter: 0.55, segments: 10 }, escena), blanco).position.set(0.42 * lado, 0.3, 1.85);
+      m(MeshBuilder.CreateSphere("jefe-pupila", { diameter: 0.26, segments: 8 }, escena), rojo).position.set(0.42 * lado, 0.28, 2.06);
     }
     this.raiz.setEnabled(false);
   }
@@ -76,7 +113,8 @@ export class Jefe {
     const base = this.raiz.position;
     base.y = 2.6 + Math.sin(this.t * 2) * 0.35;
     this.raiz.rotation.y = Math.atan2(mirar.x - base.x, mirar.z - base.z);
-    this.nucleo.rotation.set(Math.sin(this.t) * 0.3, 0, Math.cos(this.t * 0.8) * 0.3);
+    this.nucleo.rotation.set(Math.sin(this.t) * 0.08, 0, Math.cos(this.t * 0.8) * 0.06);
+    for (const a of this.alas) a.m.rotation.z = Math.sin(this.t * 34) * 0.45 * a.lado;
     const furia = this.vida < this.vidaMax / 2 ? 1.8 : 1;
     this.orbitales.forEach((o, i) => {
       const a = this.t * (1.2 + (i % 4) * 0.3) * furia + i;

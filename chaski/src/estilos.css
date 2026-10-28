@@ -725,10 +725,20 @@ body:not(.vertical) #prologo { left: max(12px, env(safe-area-inset-left)); trans
 /* Mapa del viaje como la referencia: etiquetas "N. Nombre (tema)" */
 .mapa-nodo .nombre { text-align: center; line-height: 1.15; padding: 2px 7px 3px; border: 1px solid #ffd166; }
 .mapa-nodo .nombre small { display: block; font-size: 9px; font-weight: 700; color: #ffe6a6; }
+/* Solo se ven los nombres de la zona actual, la elegida y las ya hechas (así no se enciman); el resto al pasar el mouse */
 @media (min-width: 1000px) and (min-height: 640px) {
-  .mapa-nodo .nombre { display: block; }
-  .mapa-nodo.bloqueada .nombre { opacity: .75; }
+  .mapa-nodo.hecha .nombre, .mapa-nodo:hover .nombre { display: block; }
+  .mapa-nodo .nombre { font-size: 12px; }
+  .mapa-nodo .nombre small { font-size: 10px; }
 }
+.mapa-nodo:hover { z-index: 3; }
+/* Misiones en el mapa: rombos con su ícono */
+.mapa-mision { position: absolute; transform: translate(-50%, -50%) rotate(45deg); width: 34px; height: 34px; border-radius: 8px; border: 3px solid #fff; background: linear-gradient(135deg, #ff8a5c, #c8102e); box-shadow: 0 3px 0 rgba(0,0,0,.4); padding: 0; z-index: 2; }
+.mapa-mision span { display: block; transform: rotate(-45deg); font-size: 16px; line-height: 28px; }
+.mapa-mision.hecha { background: linear-gradient(135deg, #7dffb0, #1f8f5e); }
+.mapa-mision.bloqueada { background: #4a4f6a; }
+.mapa-mision.elegida { outline: 3px solid var(--turquesa); outline-offset: 3px; }
+.mapa-camino polyline { opacity: .55; }
 /* Resultado de SQL como tabla (Misión SQL) */
 .tabla-sql-marco { display: grid; gap: 4px; margin: 4px 0; padding: 8px; border-radius: 10px; background: #f6f8ff; color: #1a1f45; white-space: normal; }
 .tabla-sql-marco b { font-size: 12px; color: #1a1f45; }

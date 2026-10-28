@@ -2,6 +2,7 @@
 // burbujas de rescate (Mama Khipu y las llamas), la runa de kallpa (responder bien
 // = disparo especial), guardianes en cada reparación y el mini-jefe Ch'aqwa Wawa.
 
+import { armarBicho, formaDe } from "./bichos";
 import { esquivoElGolpe } from "./movimiento";
 import { Scene } from "@babylonjs/core/scene";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
@@ -248,15 +249,8 @@ export class AtaquePueblo {
   private ponerBug(donde: Vector3, grande: boolean, casa: Vector3 | null, guardia: string | null) {
     const e = this.c.escena;
     const raiz = new TransformNode("minibug-pueblo", e);
-    const cuerpo = MeshBuilder.CreateBox("glitch", { size: 0.8 }, e);
-    cuerpo.material = this.bugMat;
-    cuerpo.parent = raiz;
-    for (const lado of [-1, 1]) {
-      const ojo = MeshBuilder.CreateSphere("glitch", { diameter: 0.22, segments: 6 }, e);
-      ojo.material = this.ojoMat;
-      ojo.parent = raiz;
-      ojo.position.set(0.18 * lado, 0.12, 0.41);
-    }
+    // Araña de la puna corrompida por el Bug
+    armarBicho(e, raiz, "arana", this.bugMat, this.ojoMat, 1.1);
     if (grande) raiz.scaling.setAll(1.6);
     raiz.position.copyFrom(donde);
     estallido(e, donde.add(new Vector3(0, 0.8, 0)), ["#b388ff", "#8b3dff"], 30, 4);
@@ -692,7 +686,7 @@ export class AtaquePueblo {
         if (largo > 1.1 || meta !== p) r.position.addInPlace(dir.normalize().scale(Math.min(largo, vel * dt)));
         if (!b.casa && Math.hypot(r.position.x, r.position.z) < 3.4) enFuente++;
       }
-      r.position.y = (b.grande ? 1.1 : 0.7) + Math.abs(Math.sin(b.t * 6)) * 0.35;
+      r.position.y = Math.abs(Math.sin(b.t * 6)) * 0.08; // camina pegado al suelo
       r.rotation.y = Math.atan2(p.x - r.position.x, p.z - r.position.z);
       const base = b.grande ? 1.6 : 1;
       r.scaling.setAll(this.tiempo < b.golpeHasta ? base * 1.3 : base);
