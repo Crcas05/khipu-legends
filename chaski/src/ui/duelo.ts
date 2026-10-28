@@ -63,7 +63,9 @@ export function duelo(m: Mision, fx: EfectosDuelo): Promise<ResultadoDuelo> {
       <p id="duelo-enunciado"></p>
       <p class="duelo-teoria" id="duelo-teoria"></p>
       <textarea id="duelo-codigo" spellcheck="false" autocapitalize="off" autocomplete="off" rows="5"></textarea>
+      <div class="duelo-lineas" id="duelo-lineas"></div>
       <div class="duelo-bloques" id="duelo-bloques"></div>
+      <div class="duelo-tuki" id="duelo-tuki"><p>Despertando el intérprete de Python…</p></div>
       <div class="duelo-botones">
         <button class="boton-oro" id="duelo-ejecutar">▶ EJECUTAR</button>
         <button class="boton-secundario" id="duelo-borrar" title="Borrar la última línea">⌫</button>
@@ -71,7 +73,6 @@ export function duelo(m: Mision, fx: EfectosDuelo): Promise<ResultadoDuelo> {
         <button class="boton-secundario" id="duelo-pista" title="Pista">💡</button>
         <button class="boton-secundario" id="duelo-solucion" hidden>👀 Solución</button>
       </div>
-      <div class="duelo-tuki" id="duelo-tuki"><p>Despertando el intérprete de Python…</p></div>
     </section>`;
   caja.hidden = false;
   document.body.classList.add("en-duelo");
@@ -97,6 +98,19 @@ export function duelo(m: Mision, fx: EfectosDuelo): Promise<ResultadoDuelo> {
   };
 
   const r = () => m.rondas[ronda];
+  /** Cuenta las órdenes (líneas) y avisa si sobran, antes de ejecutar. */
+  const contar = () => {
+    const x = r();
+    const el = $("duelo-lineas");
+    if (x.modo !== "bloques") {
+      el.textContent = "";
+      return;
+    }
+    const n = editor.value.split("\n").filter((l) => l.trim()).length;
+    const pide = x.solucion.split("\n").filter((l) => l.trim()).length;
+    el.textContent = n > pide ? `⚠ ${n} órdenes: te sobran algunas (toca ⌫ para borrar la última)` : `${n} ${n === 1 ? "orden" : "órdenes"}`;
+    el.classList.toggle("demas", n > pide);
+  };
   const ponerRonda = () => {
     const x = r();
     fallosRonda = 0;
@@ -120,6 +134,8 @@ export function duelo(m: Mision, fx: EfectosDuelo): Promise<ResultadoDuelo> {
           const b = bt.dataset.b!;
           if (r().modo === "bloques") {
             editor.value = editor.value ? `${editor.value}\n${b}` : b;
+            contar();
+            editor.scrollTop = editor.scrollHeight;
           } else {
             const i = editor.selectionStart ?? editor.value.length;
             const j = editor.selectionEnd ?? i;
@@ -131,6 +147,7 @@ export function duelo(m: Mision, fx: EfectosDuelo): Promise<ResultadoDuelo> {
         })
       );
     vidaJefe(1 - ronda / m.rondas.length);
+    contar();
   };
 
   editor.addEventListener("keydown", (e) => {
@@ -195,11 +212,16 @@ export function duelo(m: Mision, fx: EfectosDuelo): Promise<ResultadoDuelo> {
     });
     $("duelo-borrar").addEventListener("click", () => {
       editor.value = editor.value.split("\n").slice(0, -1).join("\n");
+      contar();
     });
-    $("duelo-reiniciar").addEventListener("click", () => (editor.value = r().plantilla));
+    $("duelo-reiniciar").addEventListener("click", () => {
+      editor.value = r().plantilla;
+      contar();
+    });
     $("duelo-pista").addEventListener("click", () => mensaje(`💡 ${r().teoria}<br>👉 ${r().pista}`, "info"));
     $("duelo-solucion").addEventListener("click", () => {
       editor.value = r().solucion;
+      contar();
       mensaje("Esta es una forma de hacerlo. Léela con calma y luego toca ▶ EJECUTAR.", "info");
     });
 

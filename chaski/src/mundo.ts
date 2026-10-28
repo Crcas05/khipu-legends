@@ -26,6 +26,8 @@ export interface Choque {
   x: number;
   z: number;
   r: number;
+  /** Obstáculo bajo (tronco, muro, roca): si Chaski salta más alto que esto, lo pasa por encima. */
+  alto?: number;
 }
 
 /** Objetos que el Ojo puede "leer" (adelanto de la Fase 1). */
@@ -343,6 +345,7 @@ export function crearMundo(escena: Scene) {
 /** Empuja la posición fuera de los objetos sólidos y dentro del límite del mapa. */
 export function resolverChoques(pos: Vector3, choques: Choque[], radio = 0.45, limite = LIMITE) {
   for (const c of choques) {
+    if (c.alto !== undefined && pos.y > c.alto) continue;
     const dx = pos.x - c.x;
     const dz = pos.z - c.z;
     const d = Math.hypot(dx, dz);

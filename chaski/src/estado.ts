@@ -45,12 +45,16 @@ export interface Estado {
   /** Armas forjadas con código y el arma en uso. */
   armas: string[];
   arma: string;
+  /** Khipu de la fauna: animales liberados y registrados con SQL; pendientes de liberar; consultas hechas. */
+  fauna: string[];
+  faunaPendiente: string[];
+  consultasFauna: string[];
 }
 
 const CLAVE = "chaski-runes-v1";
 
 function inicial(): Estado {
-  return { heroe: "", nombre: "", paso: "prologo", kallpa: 0, exp: 0, nivel: 1, palabras: [], codigo: "", logros: [], nudos: [], runas: {}, racha: 0, ultimoDia: "", rescates: [], inventario: {}, zonas: {}, sellos: {}, leccionPaso: {}, zonaActual: "", jefes: [], ayudas: [], tesoros: [], voz: false, pueblo: { ola: false, mama: false, vecinos: [], guardias: [], jefe: false }, misiones: {}, camara: "media", armas: [], arma: "huaraca" };
+  return { heroe: "", nombre: "", paso: "prologo", kallpa: 0, exp: 0, nivel: 1, palabras: [], codigo: "", logros: [], nudos: [], runas: {}, racha: 0, ultimoDia: "", rescates: [], inventario: {}, zonas: {}, sellos: {}, leccionPaso: {}, zonaActual: "", jefes: [], ayudas: [], tesoros: [], voz: false, pueblo: { ola: false, mama: false, vecinos: [], guardias: [], jefe: false }, misiones: {}, camara: "media", armas: [], arma: "huaraca", fauna: [], faunaPendiente: [], consultasFauna: [] };
 }
 
 function cargar(): Estado {

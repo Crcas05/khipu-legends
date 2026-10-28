@@ -40,6 +40,8 @@ interface Contexto {
   cambio: () => void;
   /** Termina la misión (ganada o abandonada). */
   terminar: (r: ResultadoDuelo | null) => void;
+  /** Premio de kallpa (por un esquive perfecto). */
+  premio?: (n: number) => void;
 }
 
 interface Bug {
@@ -118,6 +120,8 @@ export class MisionJuego {
     return this.fieras.vivas.length + this.porLlegar;
   }
   vida = 100;
+  /** Especies purificadas en esta misión (para liberarlas con código al terminar). */
+  liberados: string[] = [];
 
   constructor(private c: Contexto) {
     this.fieras = new Fieras({
@@ -125,8 +129,10 @@ export class MisionJuego {
       jugador: c.jugador,
       dano: (n) => this.dano(n),
       aviso: c.aviso,
+      premio: (n) => this.c.premio?.(n),
       limite: LIMITE_MISION,
-      alPurificar: () => {
+      alPurificar: (f) => {
+        this.liberados.push(f.especie);
         this.pintarObjetivo();
         if (this.emboscada && !this.quedanFieras) {
           ponerClima("nublado");
@@ -161,6 +167,7 @@ export class MisionJuego {
   async entrar(m: Mision) {
     this.salir();
     this.mision = m;
+    this.liberados = [];
     this.fase = "explorar";
     this.progreso = 0;
     this.oleada = 0;
@@ -169,8 +176,79 @@ export class MisionJuego {
     if (m.ambiente === "templo") await this.armarTemplo();
     else if (m.ambiente === "puna") await this.armarPuna();
     else await this.armarSelva();
+    this.ponerSaltables(m.ambiente);
     cambiarMusica(m.ambiente === "templo" ? "andes" : m.ambiente === "puna" ? "altiplano" : "misterio");
     this.pintarObjetivo();
+  }
+
+  /** Obstáculos bajos que se pasan SALTANDO: troncos caídos en la selva, muros de piedra en el templo,
+   *  rocas en la puna. Como un chaski de verdad corriendo por el Qhapaq Ñan. */
+  private ponerSaltables(ambiente: string) {
+    const e = this.c.escena;
+    const sitios: [number, number, number][] = [
+      [-8, -12, 0.3], [9, -6, -0.4], [-13, 2, 1.2], [12, 9, 0.2], [-6, 13, -0.6], [7, -20, 1.4], [-17, -7, 0.9], [17, -14, 0.5], [3, 18, 0.1], [-20, 10, 1.6],
+    ];
+    const madera = new StandardMaterial("m-tronco-caido", e);
+    madera.diffuseColor = Color3.FromHexString("#5a3b22");
+    madera.specularColor = new Color3(0.05, 0.05, 0.05);
+    const musgo = new StandardMaterial("m-musgo", e);
+    musgo.diffuseColor = Color3.FromHexString("#4f7a2a");
+    musgo.specularColor = Color3.Black();
+    const piedra = new StandardMaterial("m-muro-bajo", e);
+    piedra.diffuseColor = Color3.FromHexString(ambiente === "templo" ? "#b9a27c" : "#8a8580");
+    piedra.specularColor = new Color3(0.08, 0.08, 0.08);
+    const tex = texturaPiedraInca(e);
+    tex.uScale = 3;
+    tex.vScale = 0.6;
+    if (ambiente === "templo") piedra.diffuseTexture = tex;
+    let puestos = 0;
+    for (const [x, z, ang] of sitios) {
+      if (puestos >= 7) break;
+      // Lejos del inicio, de la arena del duelo y de lo que ya hay
+      if (Math.hypot(x, z + 16) < 5) continue;
+      if (Math.abs(x) < 6 && z > -14 && z < 4) continue;
+      if (this.choques.some((c) => Math.hypot(c.x - x, c.z - z) < c.r + 3)) continue;
+      if (this.items.some((i) => Math.hypot(i.malla.position.x - x, i.malla.position.z - z) < 3)) continue;
+      puestos++;
+      const largo = 4.2;
+      const dx = Math.cos(ang);
+      const dz = -Math.sin(ang);
+      if (ambiente === "selva") {
+        const t = this.malla(MeshBuilder.CreateCylinder("tronco-caido", { height: largo, diameter: 0.85, tessellation: 12 }, e));
+        t.material = madera;
+        t.position.set(x, 0.38, z);
+        t.rotation.set(0, ang, Math.PI / 2);
+        for (let i = 0; i < 4; i++) {
+          const mo = this.malla(MeshBuilder.CreateSphere("musgo", { diameter: 0.5, segments: 6 }, e));
+          mo.material = musgo;
+          const k = -1.6 + i * 1.1;
+          mo.position.set(x + dx * k, 0.75, z + dz * k);
+          mo.scaling.set(1, 0.4, 1);
+        }
+      } else if (ambiente === "templo") {
+        const muro = this.malla(MeshBuilder.CreateBox("muro-bajo", { width: largo, height: 0.7, depth: 0.8 }, e));
+        muro.material = piedra;
+        muro.position.set(x, 0.35, z);
+        muro.rotation.y = ang;
+      } else {
+        for (let i = 0; i < 4; i++) {
+          const k = -1.6 + i * 1.07;
+          const ro = this.malla(MeshBuilder.CreateSphere("roca-baja", { diameter: 1.1, segments: 7 }, e));
+          ro.material = piedra;
+          ro.position.set(x + dx * k, 0.25, z + dz * k);
+          ro.scaling.set(1, 0.55 + (i % 2) * 0.15, 0.9);
+          ro.rotation.y = i * 1.3;
+        }
+      }
+      // Choques bajos: se pasan saltando (Chaski sube a ~1.5 de altura)
+      for (let k = -largo / 2 + 0.3; k <= largo / 2 - 0.3; k += 0.7) this.choques.push({ x: x + dx * k, z: z + dz * k, r: 0.45, alto: 0.65 });
+    }
+    if (puestos && !estado.ayudas.includes("aviso-saltables")) {
+      estado.ayudas.push("aviso-saltables");
+      guardar();
+      const que = ambiente === "selva" ? "🪵 Troncos caídos" : ambiente === "templo" ? "🧱 Muros bajos" : "🪨 Rocas";
+      window.setTimeout(() => this.c.aviso(`${que} en el camino: ¡SALTA ⤴ para pasar por encima!`, 3500), 6000);
+    }
   }
 
   salir() {

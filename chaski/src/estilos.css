@@ -140,6 +140,18 @@ body.vertical #zona-joystick { width: 62vw; height: 50vh; }
 .boton-redondo.saltar { width: 66px; height: 66px; font-size: 11px; background: radial-gradient(circle at 35% 30%, #8fe36b, #2f8a1c); }
 .boton-redondo.esquivar { width: 58px; height: 58px; font-size: 10px; background: radial-gradient(circle at 35% 30%, #7ec8ff, #1f5fa8); margin-bottom: 30px; }
 .boton-redondo.esquivar.recargando { opacity: .45; }
+.dano.esquive.perfecto { color: #ffe08a; text-shadow: 0 3px 0 #a5650e, 0 0 16px #ffd166; font-size: 30px; }
+.chip.nuevo { box-shadow: 0 0 0 3px #ffd166, 0 0 16px #ffd166; }
+.fauna-tarjeta { max-height: 92dvh; overflow-y: auto; }
+.ficha-fauna { display: grid; gap: 6px; padding: 10px 12px; border-radius: 12px; background: rgba(79, 240, 220, .08); border: 1px solid rgba(79, 240, 220, .35); }
+.ficha-fauna p { margin: 0; font-size: 13.5px; line-height: 1.35; }
+.ficha-fauna i { color: #9fb0ff; font-size: 12px; }
+.conservacion { font-weight: 800; color: #7dffb0; }
+.conservacion.alerta { color: #ffb36b; }
+.consultas-fauna { display: flex; flex-wrap: wrap; gap: 6px; }
+.consultas-fauna .consulta { font-size: 12.5px; padding: 7px 10px; }
+.consultas-fauna .consulta.hecha { border-color: #7dffb0; color: #7dffb0; }
+.consultas-fauna .consulta:disabled { opacity: .4; }
 .dano.esquive { top: 48%; font-size: 28px; color: #bff3ff; text-shadow: 0 3px 0 #1f5fa8, 0 0 14px #7ec8ff; }
 body.hablando .botones-mover, body.en-prologo .botones-mover { opacity: .25; pointer-events: none; }
 body.hablando .botones-accion, body.hablando #joystick { opacity: .25; pointer-events: none; }
@@ -810,7 +822,22 @@ body.en-duelo .botones-accion, body.en-duelo #joystick, body.en-duelo #zona-joys
   padding: 6px 10px; border-radius: 12px; background: rgba(14, 18, 48, .9); border: 2px solid #1f8f5e; color: #fff; font-size: 12px; font-weight: 800; }
 .duelo-chaski .barra { width: 100%; height: 12px; }
 #duelo-vida-chaski { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #1f8f5e, #7dffb0); transition: width .3s; }
-body.vertical .duelo-panel { left: 8px; right: 8px; top: auto; bottom: 8px; width: auto; max-height: 58dvh; }
+body.vertical .duelo-panel { left: 8px; right: 8px; top: auto; bottom: 8px; width: auto; max-height: 54dvh; padding: 10px 12px 0; gap: 5px; }
+body.vertical .duelo-panel h3 { font-size: 16px; }
+body.vertical .duelo-panel p { font-size: 13px; }
+body.vertical .duelo-teoria { font-size: 12px !important; }
+body.vertical #duelo-codigo { min-height: 78px; font-size: 14px; }
+body.vertical .bloque-duelo { padding: 5px 8px; }
+body.vertical .bloque-duelo code { font-size: 13px; }
+/* El panel se desliza, pero EJECUTAR queda siempre pegado abajo y visible */
+.duelo-panel { overflow-y: auto; overscroll-behavior: contain; }
+.duelo-botones { position: sticky; bottom: 0; z-index: 2; padding: 6px 0 8px; margin-top: auto; background: linear-gradient(180deg, rgba(14,19,52,0), #0e1334 30%); }
+.duelo-panel header .cerrar { position: static; flex: 0 0 auto; padding: 0 4px; }
+.duelo-ronda { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Durante el duelo se esconden los contadores de arriba para que no se encimen con la barra del jefe */
+body.en-duelo #hud { visibility: hidden; }
+.duelo-lineas { font-size: 11px; color: #9fb0ff; text-align: right; margin-top: -4px; }
+.duelo-lineas.demas { color: #ffb36b; font-weight: 800; }
 body.vertical .duelo-barras { left: 8px; right: 8px; width: auto; top: max(8px, env(safe-area-inset-top)); }
 body.vertical .duelo-chaski { top: calc(max(8px, env(safe-area-inset-top)) + 96px); bottom: auto; width: 46vw; }
 @media (max-height: 460px) { .duelo-panel { padding: 8px 10px; gap: 4px; } .duelo-panel h3 { font-size: 15px; } .duelo-panel p { font-size: 12.5px; } #duelo-codigo { min-height: 84px; font-size: 13.5px; } .bloque-duelo { padding: 4px 8px; } .bloque-duelo code { font-size: 12.5px; } }

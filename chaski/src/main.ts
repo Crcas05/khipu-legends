@@ -64,6 +64,7 @@ import { sonido, despertarAudio, iniciarMusica, alternarSilencio, estaSilenciado
 import { crearModelo, ponerChullo, ponerMontera } from "./modelos";
 import { crearChorro, estallido, crearPolvo, crearDestello, Sacudida } from "./efectos";
 import type { ParticleSystem } from "@babylonjs/core/Particles/particleSystem";
+import { liberarAnimales, abrirKhipuFauna } from "./ui/khipuFauna";
 import { saltar as iniciarSalto, empezarEsquive, esquivando, actualizarSalto, puedeEsquivar, enElAire, invulnerable } from "./movimiento";
 
 type Calidad = "bajo" | "medio" | "alto";
@@ -1092,6 +1093,7 @@ const misionJuego = new MisionJuego({
   objetivo: (t) => fijarObjetivo(t),
   cambio: () => actualizarBotones(),
   terminar: (r) => void terminarMision(r),
+  premio: (n) => ganarKallpa(n),
 });
 
 /** La misión que encarga esta persona (si ya está disponible). */
@@ -1150,6 +1152,11 @@ async function terminarMision(r: { ganado: boolean; errores: number; golpes: num
   if (n === 3) desbloquear("tres-estrellas");
   cambiarMusica(m.ambiente === "puna" ? "altiplano" : m.ambiente === "selva" ? "selva" : "andes", true);
   const eleccion = await resultadoMision(m, n, r.errores, r.golpes);
+  // Los animales purificados se liberan con Python y se anotan con SQL
+  if (misionJuego.liberados.length) {
+    await liberarAnimales(misionJuego.liberados);
+    misionJuego.liberados = [];
+  }
   if (eleccion === "repetir") await viajarA("mision");
   else {
     await viajarA("plaza");
@@ -1188,6 +1195,10 @@ async function siguienteMensaje() {
       }
       if (m) {
         await hablar([{ quien: "narrador", texto: ave === "condor" ? "El cóndor deja caer el khipu a tus pies. Sus nudos cuentan un mensaje urgente…" : "El guacamayo grita y suelta el khipu: ¡viene de la selva del Ucayali!" }, ...m.pedido]);
+        if (region !== "plaza") {
+          mensajero.vete();
+          return;
+        }
         const ok = await tarjetaMision(m);
         mensajero.vete();
         if (ok) window.setTimeout(() => void iniciarMision(m), 50);
@@ -1371,6 +1382,8 @@ function actualizarBotones() {
   $("chip-mapa").hidden = !yaPaso("victoria") || batalla.activa;
   $("chip-misiones").hidden = !llego("completo") || batalla.activa || region === "mision";
   $("chip-armas").hidden = !llego("completo") || batalla.activa;
+  $("chip-fauna").hidden = !llego("completo") || batalla.activa || (!estado.fauna.length && !estado.faunaPendiente.length);
+  $("chip-fauna").classList.toggle("nuevo", estado.faunaPendiente.length > 0);
   const arma = armaActual();
   $("boton-huaraca").innerHTML = `${arma.icono}<br>${arma.nombre.toUpperCase()}`;
   $("boton-arma").hidden = $("boton-huaraca").hidden || desbloqueadas().length < 2;
@@ -1449,6 +1462,13 @@ $("boton-arma").addEventListener("click", () => {
   sonido.toque();
   aviso(`${a.icono} ${a.nombre}: ${a.como}`, 2000);
   actualizarBotones();
+});
+$("chip-fauna").addEventListener("click", () => {
+  sonido.toque();
+  void enCalma(async () => {
+    await abrirKhipuFauna();
+    actualizarBotones();
+  });
 });
 $("chip-armas").addEventListener("click", () => {
   sonido.toque();
@@ -1844,18 +1864,22 @@ escena.onBeforeRenderObservable.add(() => {
       else chaski.festejar();
     }
   } else {
-    camara.alpha += (-Math.PI / 2 - camara.alpha) * Math.min(1, dt * 4);
+    // En el duelo la cámara se pone de costado: se ve a Chaski Y al jefe frente a frente
+    // (horizontal: el panel está a la izquierda → Chaski a la derecha; vertical: el panel está abajo)
+    const vertDuelo = document.body.classList.contains("vertical");
+    camara.alpha += ((misionJuego.enDuelo ? -Math.PI / 2 + (vertDuelo ? 1.0 : -0.42) : -Math.PI / 2) - camara.alpha) * Math.min(1, dt * 4);
     if (misionJuego.enDuelo) {
       const vert = document.body.classList.contains("vertical");
-      camara.targetScreenOffset.x += ((vert ? 0 : 4.2) - camara.targetScreenOffset.x) * Math.min(1, dt * 3);
+      camara.targetScreenOffset.x += ((vert ? 0 : 6.2) - camara.targetScreenOffset.x) * Math.min(1, dt * 3);
       camara.targetScreenOffset.y += ((vert ? 3 : -0.8) - camara.targetScreenOffset.y) * Math.min(1, dt * 3);
     } else camara.targetScreenOffset.scaleInPlace(1 - Math.min(1, dt * 4));
     camara.beta += ((misionJuego.enDuelo ? 1.12 : betaBase) - camara.beta) * Math.min(1, dt * 4);
-    camara.target.copyFrom(Vector3.Lerp(camara.target, new Vector3(pos.x, 1.2 + pos.y * 0.25, pos.z), Math.min(1, dt * 6)).add(sacudida.tomar(dt)));
+    const mira = misionJuego.enDuelo ? new Vector3(pos.x, 1.5, pos.z + 3.8) : new Vector3(pos.x, 1.2 + pos.y * 0.25, pos.z);
+    camara.target.copyFrom(Vector3.Lerp(camara.target, mira, Math.min(1, dt * 6)).add(sacudida.tomar(dt)));
     // Cámara de cine: se acerca durante los diálogos
     // En lugares cerrados (selva, templo) la cámara no se aleja tanto: si no, queda dentro de los árboles
     const tope = region === "mision" ? (misionActual?.ambiente === "selva" ? 15 : misionActual?.ambiente === "templo" ? 21 : 30) : region === "selva" ? 19 : 60;
-    let radioObjetivo = misionJuego.enDuelo ? 12 : Math.min(tope, dialogoAbierto() ? radioBase * 0.72 : radioBase);
+    let radioObjetivo = misionJuego.enDuelo ? (vertDuelo ? 13 : 15) : Math.min(tope, dialogoAbierto() ? radioBase * 0.72 : radioBase);
     // Que la cámara no se meta dentro de los cerros del borde: se acerca si Chaski está cerca del límite
     const borde = region === "plaza" ? 40 : region === "selva" ? 38 : region === "mision" ? (misionActual?.ambiente === "puna" ? 32 : misionActual?.ambiente === "selva" ? 30 : 34) : 0;
     if (borde) {
@@ -2281,6 +2305,8 @@ if (new URLSearchParams(location.search).has("prueba")) {
     pueblo: ataque.prueba,
     mision: misionJuego.prueba,
     misionJuego,
+    liberar: (ids: string[]) => liberarAnimales(ids),
+    khipuFauna: () => abrirKhipuFauna(),
     iniciarMision: (id: string) => {
       const m = MISIONES.find((x) => x.id === id);
       if (m) void iniciarMision(m);
